@@ -22,14 +22,9 @@
 
 #include <semaphore.h>
 #include <stdbool.h>
-
+#include <unordered_map>
+using namespace std;
 struct sockaddr_in si_other;
-int s, slen;
-
-void diep(char *s) {
-    perror(s);
-    exit(1);
-}
 
 typedef struct sharedData {
     int timeout;
@@ -44,8 +39,31 @@ typedef struct sharedData {
     sem_t sem;
 } shared_data;
 
+typedef struct Segment{
+    long seq_num;
+    short len;
+    char datagram[1280];
+} segment;
+
+int s, slen;
+int nums = 0;
+int package_total;
+unordered_map<int, segment*> buffer;
 
 shared_data data;
+
+void diep(char *s) {
+    perror(s);
+    exit(1);
+}
+
+
+
+
+
+void* receiveAck(void*){
+    
+}
 
 void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* filename, unsigned long long int bytesToTransfer) {
     //Open the file
@@ -81,12 +99,33 @@ void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* file
 		}
 
 		sem_wait(&data.sem);
+        int upper = data.sendBase + (int)data.CW;
+        sem_post(&data.sem);
+
+        while(data.currIdx < package_total && data.currIdx < upper){
+            segment *seg = buffer[data.currIdx];
+            if(sendto(s, seg, sizeof(*seg), 0, (struct sockaddr *)&si_other, sizeof(si_other)) == -1){
+                diep("Sending error");
+            }
+
+            data.currIdx++;
+
+            sem_wait(&data.sem);
+            nums++;
+            sem_post(&data.sem);
+
+            if(data.currIdx == 1){
+                pthread_create(&t, NULL, &receiveAck, NULL);
+            }
+        }
 	}
     printf("Closing the socket\n");
     close(s);
     return;
 
 }
+
+
 
 /*
  * 
