@@ -58,7 +58,7 @@ void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* file
         exit(1);
     }
 
-	/* Determine how many bytes to transfer */
+    /* Determine how many bytes to transfer */
 
     slen = sizeof (si_other);
 
@@ -74,18 +74,18 @@ void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* file
     }
 
 
-	/* Send data and receive acknowledgements on s*/
-	pthread_t t; // ?
-	clock_t start = clock();
-	while(true){
-		if(data.complete){
-		    break;
-		}
+    /* Send data and receive acknowledgements on s*/
+    pthread_t t; // ?
+    clock_t start = clock();
+    while(true){
+        if(data.complete){
+            break;
+        }
 
-		sem_wait(&data.sem);
+        sem_wait(&data.sem);
         int upper = data.sendBase + (int)data.CW;
         sem_post(&data.sem);
-	}
+    }
     printf("Closing the socket\n");
     close(s);
     return;
@@ -114,5 +114,4 @@ int main(int argc, char** argv) {
 
     return (EXIT_SUCCESS);
 }
-
 

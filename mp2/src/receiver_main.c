@@ -45,10 +45,10 @@ void reliablyReceive(unsigned short int myUDPport, char* destinationFile) {
         diep("bind");
 
 
-	/* Now receive data and send acknowledgements */    
+    /* Now receive data and send acknowledgements */    
 
     close(s);
-	printf("%s received.", destinationFile);
+    printf("%s received.", destinationFile);
     return;
 }
 
@@ -68,4 +68,3 @@ int main(int argc, char** argv) {
 
     reliablyReceive(udpPort, argv[2]);
 }
-
