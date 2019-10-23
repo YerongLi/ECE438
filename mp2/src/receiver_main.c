@@ -17,21 +17,21 @@
 #include <pthread.h>
 
 
+#define MAXBUFFERLEN 2000
+typedef unsigned long long int ull;
+typedef unsigned short int us;
 
 struct sockaddr_in si_me, si_other;
-int s, slen;
+int s;
+socklen_t slen;
 
 void diep(char *s) {
     perror(s);
     exit(1);
 }
 
-
-
-void reliablyReceive(unsigned short int myUDPport, char* destinationFile) {
-    
+void reliablyReceive(us myUDPport, char* destinationFile) {
     slen = sizeof (si_other);
-
 
     if ((s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
         diep("socket");
@@ -41,14 +41,25 @@ void reliablyReceive(unsigned short int myUDPport, char* destinationFile) {
     si_me.sin_port = htons(myUDPport);
     si_me.sin_addr.s_addr = htonl(INADDR_ANY);
     printf("Now binding\n");
-    if (bind(s, (struct sockaddr*) &si_me, sizeof (si_me)) == -1)
+    if (bind(s, (struct sockaddr*)&si_me, sizeof (si_me)) == -1)
         diep("bind");
 
-
-    /* Now receive data and send acknowledgements */    
-
+	/* Now receive data and send acknowledgements */
+	FILE* fp = fopen(destinationFile, "w");
+	fclose(fp);
+    char buffer[MAXBUFFERLEN];
+	ull numbytes, total = 0;
+	while ((numbytes = recvfrom(s, buffer, MAXBUFFERLEN-1 , 0,
+		(struct sockaddr *)&si_other, &slen))) {
+		FILE* fp = fopen(destinationFile, "a+");
+		buffer[numbytes] = '\0';
+		total += numbytes;
+		fwrite(buffer, 1, numbytes, fp);
+		printf("File written, cumulative %lld bytes.\n", total);
+		fclose(fp);
+	}
     close(s);
-    printf("%s received.", destinationFile);
+	printf("%s received.", destinationFile);
     return;
 }
 
@@ -57,14 +68,15 @@ void reliablyReceive(unsigned short int myUDPport, char* destinationFile) {
  */
 int main(int argc, char** argv) {
 
-    unsigned short int udpPort;
+    us udpPort;
 
     if (argc != 3) {
         fprintf(stderr, "usage: %s UDP_port filename_to_write\n\n", argv[0]);
         exit(1);
     }
 
-    udpPort = (unsigned short int) atoi(argv[1]);
+    udpPort = (us) atoi(argv[1]);
 
     reliablyReceive(udpPort, argv[2]);
 }
+

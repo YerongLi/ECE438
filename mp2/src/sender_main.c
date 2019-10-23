@@ -20,48 +20,22 @@
 #include <string.h>
 #include <sys/time.h>
 
-#include <semaphore.h>
-#include <stdbool.h>
+typedef unsigned long long int ull;
+typedef unsigned short int us;
+const int payload = 1472;
 
 struct sockaddr_in si_other;
-int s, slen;
+int s;
+socklen_t slen;
 
 void diep(char *s) {
     perror(s);
     exit(1);
 }
 
-typedef struct sharedData {
-    int timeout;
-    int dupAcksCount;
-    int threshold;
-    double CW;
-    int mode;
-    int sendBase;
-    long int timer;
-    int currIdx;
-    bool complete;
-    sem_t sem;
-} shared_data;
 
-#define INIT_sharedData
-
-
-shared_data data;
-
-void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* filename, unsigned long long int bytesToTransfer) {
-    //Open the file
-    FILE *fp;
-    fp = fopen(filename, "rb");
-    if (fp == NULL) {
-        printf("Could not open file to send.");
-        exit(1);
-    }
-
-    /* Determine how many bytes to transfer */
-
+void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesToTransfer) {
     slen = sizeof (si_other);
-
     if ((s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
         diep("socket");
 
@@ -73,23 +47,40 @@ void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* file
         exit(1);
     }
 
+    //Open the file
+    FILE *fp;
+    fp = fopen(filename, "rb");
+    if (!fp)
+        diep("Could not open file to send.");
+    ull fileSize, actualBytes;
+    fseek(fp, 0, SEEK_END);
+    fileSize = ftell(fp);
+    rewind(fp);
+    printf("fileSize = %lld\n", fileSize);
 
-    /* Send data and receive acknowledgements on s*/
-    pthread_t t; // ?
-    clock_t start = clock();
-    while(true){
-        if(data.complete){
-            break;
-        }
+	/* Determine how many bytes to transfer */
+    if (bytesToTransfer > fileSize) {
+        actualBytes = fileSize;
+        printf("bytesToTransfer too large, use actual bytes %lld.\n", actualBytes);
+    } else
+        actualBytes = bytesToTransfer;
+    char buffer[actualBytes+1];
+    fread(buffer, 1, actualBytes, fp);
+    buffer[actualBytes] = '\0';
+    fclose(fp);
 
-        sem_wait(&data.sem);
-        int upper = data.sendBase + (int)data.CW;
-        sem_post(&data.sem);
+	/* Send data and receive acknowledgements on s */
+    ull sent = 0;
+    while (sent < actualBytes) {
+        ull left = actualBytes - sent;
+        ull curSend = left < payload ? left : payload;
+        sent += sendto(s, buffer+sent, curSend, 0,
+             (struct sockaddr *)&si_other, slen);
     }
+    printf("%lld bytes sent.\n", sent);
     printf("Closing the socket\n");
     close(s);
     return;
-
 }
 
 /*
@@ -97,14 +88,14 @@ void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* file
  */
 int main(int argc, char** argv) {
 
-    unsigned short int udpPort;
-    unsigned long long int numBytes;
+    us udpPort;
+    ull numBytes;
 
     if (argc != 5) {
         fprintf(stderr, "usage: %s receiver_hostname receiver_port filename_to_xfer bytes_to_xfer\n\n", argv[0]);
         exit(1);
     }
-    udpPort = (unsigned short int) atoi(argv[2]);
+    udpPort = (us) atoi(argv[2]);
     numBytes = atoll(argv[4]);
 
 
@@ -114,4 +105,5 @@ int main(int argc, char** argv) {
 
     return (EXIT_SUCCESS);
 }
+
 
