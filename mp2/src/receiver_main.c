@@ -18,13 +18,13 @@
 
 typedef unsigned long long int ull;
 typedef unsigned short int us;
-const int ReceiveBuffer = 2000;
-#define payload 1400
+#define MAXBUFLEN 2000
+#define PAYLOAD 1400
 
 typedef struct {
 	ull seqNum;
 	ull length;
-	char data[payload+1];
+	char data[PAYLOAD+1];
 } segment;
 
 typedef struct {
@@ -50,21 +50,22 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
     si_me.sin_port = htons(myUDPport);
     si_me.sin_addr.s_addr = htonl(INADDR_ANY);
     printf("Now binding\n");
-    if (bind(s, (struct sockaddr*)&si_me, sizeof (si_me)) == -1){
+    if (bind(s, (struct sockaddr*)&si_me, sizeof si_me) == -1){
         diep("bind");
 	}
 
 	/* Now receive data and send acknowledgements */
 	FILE* fp = fopen(destinationFile, "w");
 	fclose(fp);
-    // char buffer[ReceiveBuffer];
+	char buffer[MAXBUFLEN][PAYLOAD + 1];
     segment packet;
 	ackmnt ack; 
 	ull numbytes, total = 0;
 	while (recvfrom(s, &packet, sizeof packet, 0,
 	(struct sockaddr *)&si_other, &slen)) {
-		if (packet.seqNum == -1)
-			break;
+		if (packet.seqNum == -1) {
+			diep("Reciever package sequence number");
+		}
 		FILE* fp = fopen(destinationFile, "a+");
 		numbytes = packet.length;
 		packet.data[numbytes] = '\0';
@@ -72,6 +73,7 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
 		ack.seqNum = packet.seqNum;
 		sendto(s, &ack, sizeof(ackmnt), 0,
              (struct sockaddr *)&si_other, slen);
+		strcpy(buffer + packet.seqNum, packet.data);
 		fwrite(packet.data, 1, numbytes, fp);
 		printf("File written, cumulative %lld bytes.\n", total);
 		fclose(fp);

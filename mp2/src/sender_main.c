@@ -23,8 +23,8 @@
 
 typedef unsigned long long int ull;
 typedef unsigned short int us;
-#define payload 1400
-#define TIMEOUT 1000
+#define PAYLOAD 1400
+#define TIMEOUT 1000 // in milliseconds
 const int TimeOutInterval = 25;
 const int MaxBuffer = 1000000;
 
@@ -33,11 +33,13 @@ struct sockaddr_in si_other;
 int s;
 pthread_t thread_id;
 socklen_t slen;
+/* sender config */
+int cwnd = 200;
 
 typedef struct {
 	ull seqNum;
 	ull length;
-	char data[payload+1];
+	char data[PAYLOAD+1];
 } segment;
 
 typedef struct {
@@ -84,8 +86,8 @@ void storeFile(char* filename, segment** packetBuffer, int packetNum, ull actual
     	segment* packet = malloc(sizeof(*packet));
     	packet->seqNum = i;
     	if (i != packetNum-1) {
-    		packet->length = payload;
-    		read += payload;
+    		packet->length = PAYLOAD;
+    		read += PAYLOAD;
     	} else
     		packet->length = actualBytes - read;
     	fread(packet->data, 1, packet->length, fp);
@@ -96,14 +98,21 @@ void storeFile(char* filename, segment** packetBuffer, int packetNum, ull actual
 
 void *receiveAck(void *vargp) {
     ackmnt ack;
+    struct timeval tout;
+    tout.tv_sec = 0;
+    tout.tv_usec = TIMEOUT;
+    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tout, sizeof(tout));
     printf("receive Ack started\n");
-	while (1) {
-        if (recvfrom(s, &ack, sizeof ack, 0,
-            (struct sockaddr *)&si_other, &slen)) {
-                printf("%lld\n", ack.seqNum);
-                break;
-            }
-
+    int numbytes = recvfrom(s, &ack, sizeof ack, 0,
+            (struct sockaddr *)&si_other, &slen);
+    switch (numbytes)
+    {
+    case -1:
+        printf("timeout\n");
+        break;
+    
+    default:
+        break;
     }
     return NULL;
 }
@@ -123,7 +132,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
 
     /* Open file and store data into packet_buffer */
     ull actualBytes = readSize(filename, bytesToTransfer);
-    int packetNum = ceil(actualBytes/(float)payload);
+    int packetNum = ceil(actualBytes/(float)PAYLOAD);
     segment* packetBuffer[packetNum];
     storeFile(filename, packetBuffer, packetNum, actualBytes);
 
