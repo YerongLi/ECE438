@@ -16,14 +16,16 @@
 #include <unistd.h>
 #include <pthread.h>
 
-
-#define MAXBUFFERLEN 2000
 typedef unsigned long long int ull;
 typedef unsigned short int us;
+const int ReceiveBuffer = 2000;
+#define payload 1400
 
-struct sockaddr_in si_me, si_other;
-int s;
-socklen_t slen;
+typedef struct {
+	ull seqNum;
+	ull length;
+	char data[payload+1];
+} segment;
 
 void diep(char *s) {
     perror(s);
@@ -31,11 +33,13 @@ void diep(char *s) {
 }
 
 void reliablyReceive(us myUDPport, char* destinationFile) {
+	/* Open socket and bind */
+	struct sockaddr_in si_me, si_other;
+	int s;
+	socklen_t slen;
     slen = sizeof (si_other);
-
     if ((s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
         diep("socket");
-
     memset((char *) &si_me, 0, sizeof (si_me));
     si_me.sin_family = AF_INET;
     si_me.sin_port = htons(myUDPport);
@@ -47,19 +51,23 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
 	/* Now receive data and send acknowledgements */
 	FILE* fp = fopen(destinationFile, "w");
 	fclose(fp);
-    char buffer[MAXBUFFERLEN];
+    // char buffer[ReceiveBuffer];
+    segment packet;
 	ull numbytes, total = 0;
-	while ((numbytes = recvfrom(s, buffer, MAXBUFFERLEN-1 , 0,
-		(struct sockaddr *)&si_other, &slen))) {
+	while (recvfrom(s, &packet, sizeof packet, 0,
+	(struct sockaddr *)&si_other, &slen)) {
+		if (packet.seqNum == -1)
+			break;
 		FILE* fp = fopen(destinationFile, "a+");
-		buffer[numbytes] = '\0';
+		numbytes = packet.length;
+		packet.data[numbytes] = '\0';
 		total += numbytes;
-		fwrite(buffer, 1, numbytes, fp);
-		printf("File written, cumulative %lld bytes.\n", total);
+		fwrite(packet.data, 1, numbytes, fp);
+		// printf("File written, cumulative %lld bytes.\n", total);
 		fclose(fp);
 	}
     close(s);
-	printf("%s received.", destinationFile);
+	printf("%s received.\n", destinationFile);
     return;
 }
 
