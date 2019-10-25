@@ -24,14 +24,25 @@
 typedef unsigned long long int ull;
 typedef unsigned short int us;
 #define payload 1400
+#define TIMEOUT 1000
 const int TimeOutInterval = 25;
 const int MaxBuffer = 1000000;
+
+/* sockect config */
+struct sockaddr_in si_other;
+int s;
+pthread_t thread_id;
+socklen_t slen;
 
 typedef struct {
 	ull seqNum;
 	ull length;
 	char data[payload+1];
 } segment;
+
+typedef struct {
+	ull seqNum;
+} ackmnt;
 
 void diep(char* s) {
     perror(s);
@@ -83,14 +94,27 @@ void storeFile(char* filename, segment** packetBuffer, int packetNum, ull actual
     }
 }
 
+void *receiveAck(void *vargp) {
+    ackmnt ack;
+    printf("receive Ack started\n");
+	while (1) {
+        if (recvfrom(s, &ack, sizeof ack, 0,
+            (struct sockaddr *)&si_other, &slen)) {
+                printf("%lld\n", ack.seqNum);
+                break;
+            }
+
+    }
+    return NULL;
+}
+
 void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesToTransfer) {
 	/* Open socket */
-	struct sockaddr_in si_other;
-	int s;
-	socklen_t slen;
+
     slen = sizeof(si_other);
-    if ((s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+    if ((s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
         diep("socket");
+        }
     memset((char *) &si_other, 0, sizeof(si_other));
     si_other.sin_family = AF_INET;
     si_other.sin_port = htons(hostUDPport);
@@ -110,6 +134,8 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
 		sent += packet->length;
 		sendto(s, packet, sizeof(*packet), 0,
              (struct sockaddr *)&si_other, slen);
+        pthread_create(&thread_id, NULL, receiveAck, NULL);
+        pthread_join(thread_id, NULL);
 	}
 	segment end;
 	end.seqNum = -1;
@@ -120,6 +146,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
     close(s);
     return;
 }
+
 
 /*
  * 

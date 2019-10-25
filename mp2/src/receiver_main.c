@@ -27,6 +27,11 @@ typedef struct {
 	char data[payload+1];
 } segment;
 
+typedef struct {
+	ull seqNum;
+} ackmnt;
+
+
 void diep(char *s) {
     perror(s);
     exit(1);
@@ -45,14 +50,16 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
     si_me.sin_port = htons(myUDPport);
     si_me.sin_addr.s_addr = htonl(INADDR_ANY);
     printf("Now binding\n");
-    if (bind(s, (struct sockaddr*)&si_me, sizeof (si_me)) == -1)
+    if (bind(s, (struct sockaddr*)&si_me, sizeof (si_me)) == -1){
         diep("bind");
+	}
 
 	/* Now receive data and send acknowledgements */
 	FILE* fp = fopen(destinationFile, "w");
 	fclose(fp);
     // char buffer[ReceiveBuffer];
     segment packet;
+	ackmnt ack; 
 	ull numbytes, total = 0;
 	while (recvfrom(s, &packet, sizeof packet, 0,
 	(struct sockaddr *)&si_other, &slen)) {
@@ -62,8 +69,11 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
 		numbytes = packet.length;
 		packet.data[numbytes] = '\0';
 		total += numbytes;
+		ack.seqNum = packet.seqNum;
+		sendto(s, &ack, sizeof(ackmnt), 0,
+             (struct sockaddr *)&si_other, slen);
 		fwrite(packet.data, 1, numbytes, fp);
-		// printf("File written, cumulative %lld bytes.\n", total);
+		printf("File written, cumulative %lld bytes.\n", total);
 		fclose(fp);
 	}
     close(s);

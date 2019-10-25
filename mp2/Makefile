@@ -1,9 +1,7 @@
-#Use g++ for compilation
-CC = g++ 
 #If you use threads, add -pthread here.
-COMPILERFLAGS = -g -Wall -Wextra -Wno-sign-compare -std=c++11 
+COMPILERFLAGS = -g -Wall -Wextra -Wno-sign-compare 
 #Any libraries you might need linked in.
-LINKLIBS = -lpthread
+LINKLIBS = -lpthread -lm
 
 #The components of each program. When you create a src/foo.c source file, add obj/foo.o here, separated
 #by a space (e.g. SOMEOBJECTS = obj/foo.o obj/bar.o obj/baz.o).
