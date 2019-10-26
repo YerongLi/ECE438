@@ -40,12 +40,13 @@ typedef struct {
 	ull seqNum;
 	ull length;
 	char data[PAYLOAD+1];
+	/* end flag 
+		0 : normal packet
+		1 : end of the buffer
+		2 : end of the file
+	*/
+	int end; 
 } segment;
-
-typedef struct {
-	ull seqNum;
-} ackmnt;
-
 void diep(char* s) {
     perror(s);
     exit(1);
@@ -82,9 +83,10 @@ void storeFile(char* filename, segment** packetBuffer, int packetNum, ull actual
 	FILE *fp;
     fp = fopen(filename, "rb");
     ull read = 0;
-    for (int i = 0; i < packetNum; i++) {
+    for (ull i = 1; i <= packetNum; i++) {
     	segment* packet = malloc(sizeof(*packet));
     	packet->seqNum = i;
+        packet->end = 0;
     	if (i != packetNum-1) {
     		packet->length = PAYLOAD;
     		read += PAYLOAD;
@@ -94,10 +96,11 @@ void storeFile(char* filename, segment** packetBuffer, int packetNum, ull actual
     	packet->data[packet->length] = '\0';
     	packetBuffer[i] = packet;
     }
+    packetBuffer[packetNum - 1] -> end = 2;
 }
 
 void *receiveAck(void *vargp) {
-    ackmnt ack;
+    ull ack;
     struct timeval tout;
     tout.tv_sec = 0;
     tout.tv_usec = TIMEOUT;
@@ -105,14 +108,9 @@ void *receiveAck(void *vargp) {
     printf("receive Ack started\n");
     int numbytes = recvfrom(s, &ack, sizeof ack, 0,
             (struct sockaddr *)&si_other, &slen);
-    switch (numbytes)
-    {
-    case -1:
-        printf("timeout\n");
-        break;
-    
-    default:
-        break;
+    if (0 == ack) {
+        close(s);
+        exit(0);
     }
     return NULL;
 }
@@ -134,12 +132,15 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
     ull actualBytes = readSize(filename, bytesToTransfer);
     int packetNum = ceil(actualBytes/(float)PAYLOAD);
     segment* packetBuffer[packetNum];
+    /* Read file to send to the buffer window  */
     storeFile(filename, packetBuffer, packetNum, actualBytes);
 
 	/* Send data and receive acknowledgements on s */
 	ull sent = 0;
-	for (int i = 0; i < packetNum; i++) {
+	for (ull i = 1; i <= packetNum; i++) {
+
 		segment* packet = packetBuffer[i];
+        printf("%lld\n", packet->seqNum);
 		sent += packet->length;
 		sendto(s, packet, sizeof(*packet), 0,
              (struct sockaddr *)&si_other, slen);

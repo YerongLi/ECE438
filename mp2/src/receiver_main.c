@@ -25,17 +25,19 @@ typedef struct {
 	ull seqNum;
 	ull length;
 	char data[PAYLOAD+1];
+	/* end flag 
+		0 : normal packet
+		1 : end of the buffer
+		2 : end of the file
+	*/
+	int end; 
 } segment;
-
-typedef struct {
-	ull seqNum;
-} ackmnt;
-
 
 void diep(char *s) {
     perror(s);
     exit(1);
 }
+
 
 void reliablyReceive(us myUDPport, char* destinationFile) {
 	/* Open socket and bind */
@@ -55,30 +57,61 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
 	}
 
 	/* Now receive data and send acknowledgements */
-	FILE* fp = fopen(destinationFile, "w");
+	FILE* fp;
+	/* Clear the target file */
+	fp = fopen(destinationFile, "w");
 	fclose(fp);
-	char buffer[MAXBUFLEN][PAYLOAD + 1];
+	segment* buffer;
+	buffer = malloc((MAXBUFLEN + 1) * sizeof(segment));
+	int received[MAXBUFLEN + 1];
     segment packet;
-	ackmnt ack; 
-	ull numbytes, total = 0;
+	ull ack = 0, count = 0, total = 0;
 	while (recvfrom(s, &packet, sizeof packet, 0,
 	(struct sockaddr *)&si_other, &slen)) {
 		if (packet.seqNum == -1) {
 			diep("Reciever package sequence number");
 		}
-		FILE* fp = fopen(destinationFile, "a+");
-		numbytes = packet.length;
-		packet.data[numbytes] = '\0';
-		total += numbytes;
-		ack.seqNum = packet.seqNum;
-		sendto(s, &ack, sizeof(ackmnt), 0,
+		if (received[packet.seqNum] == 0) {
+			received[packet.seqNum] = 1;
+			count++;
+			packet.data[packet.length] = '\0';
+			total += packet.length;
+			ack = packet.seqNum;
+			buffer[packet.seqNum] = packet;
+			sendto(s, &ack, sizeof(int), 0,
              (struct sockaddr *)&si_other, slen);
-		strcpy(buffer + packet.seqNum, packet.data);
-		fwrite(packet.data, 1, numbytes, fp);
-		printf("File written, cumulative %lld bytes.\n", total);
-		fclose(fp);
+			 if (packet.end > 0 && packet.seqNum == count) {
+				fp = fopen(destinationFile, "a+");
+				for (int i = 1; i <= count; i++) {
+					fwrite(buffer[i].data, sizeof(char), buffer[i].length, fp);
+				}
+				fclose(fp);
+				/**
+				 * If we have reach the end of file : the last packet have ending flag 2
+				 * then we send ACKs with value 0 and close the socket 
+				 */
+				if (packet.end == 2) {
+					for (int i = 0; i < 20; i++) {
+						ack = 0;
+						sendto(s, &ack, sizeof(int), 0,
+             			(struct sockaddr *)&si_other, slen);
+					}
+					break;
+				}
+			 }
+		}
+		if (0) {
+
+		}
+
+
+	//	strcpy(buffer + packet.seqNum, packet.data);
+	//	fwrite(packet.data, 1, numbytes, fp);
+
+
 	}
     close(s);
+	printf("File written, cumulative %lld bytes.\n", total);
 	printf("%s received.\n", destinationFile);
     return;
 }
