@@ -45,9 +45,9 @@ enum Congestion_Control{SS, CA, FR};
 int mode = SS;
 int dupACKcount = 0;
 int timeOutInterval = 50; // 50ms
-ull ssthresh = 1000;
-ull MSS = 10;
-ull cwnd = 10;
+int ssthresh = 1000;
+const int MSS = 10;
+double cwnd = 10;
 ull sendBase = 0;
 ull nextSeqNum = 0;
 sem_t mutex;
@@ -75,11 +75,6 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
     storeFile(filename, actualBytes);
 
 	/* Send data and receive acknowledgements on s */
-	// for (int i = 0; i < packetNum; i++) {
-	// 	segment* packet = packetBuffer[i];
-	// 	sendto(s, packet, sizeof(segment), 0,
-	// 		(struct sockaddr *)&si_other, slen);
-	// }
 	pthread_t recvThread;
 	sem_init(&mutex, 0, 1);
 	while (1) {
@@ -99,7 +94,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
 	}
 	pthread_join(recvThread, NULL);
     printf("%lld bytes sent\n", actualBytes);
-    
+
     /* Release memory */
 	for (int i = 0; i < packetNum; i++)
 		free(packetBuffer[i]);
@@ -119,8 +114,7 @@ void* threadRecvRetransmit() {
     	ull ack;
     	int numbytes = recvfrom(s, &ack, sizeof(ull), 0,
     		(struct sockaddr *)&si_other, &slen);
-    	if (numbytes == -1) {
-    		/* Timeout */
+    	if (numbytes == -1) { // Timeout
     		segment* packet = packetBuffer[sendBase];
 			sendto(s, packet, sizeof(segment), 0,
 				(struct sockaddr *)&si_other, slen);
@@ -132,7 +126,7 @@ void* threadRecvRetransmit() {
 			dupACKcount = 0;
 			continue;
     	}
-    	printf("Received ack = %lld\n", ack);
+    	printf("Received ack = %lld, cwnd = %f\n", ack, cwnd);
     	if (ack == packetNum)
     		break;
     	if (mode == SS) { // Slow start

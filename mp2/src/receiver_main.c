@@ -20,7 +20,6 @@
 typedef unsigned long long int ull;
 typedef unsigned short int us;
 #define payload 1400
-const int receiveBuffer = 2000;
 
 typedef struct {
 	ull seqNum;
@@ -31,6 +30,7 @@ typedef struct {
 
 /* Parameters */
 ull nextByteExpected = 0;
+const int receiveBuffer = 50000;
 
 void diep(char *s);
 void writeFile(char* destinationFile, segment** buffer, ull packetNum);
@@ -61,8 +61,7 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
 		recvfrom(s, &packet, sizeof(segment), 0,
 			(struct sockaddr *)&si_other, &slen);
 		ull seqNum = packet.seqNum;
-		printf("seqNum = %lld, nextByteExpected = %lld\n",
-			seqNum, nextByteExpected);
+		printf("seqNum = %lld, nextByteExpected = %lld\n", seqNum, nextByteExpected);
 		if (!buffer[seqNum]) { // duplicate ACK
 			segment* cur = malloc(sizeof(segment));
 			cur->seqNum = seqNum;
@@ -82,13 +81,14 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
 		if (nextByteExpected == packetNum)
 			break;
 	}
-	
+
 	/* Close connection */
 	for (int i = 0; i < 20; i++) {
 		sendto(s, &nextByteExpected, sizeof(ull), 0,
 			(struct sockaddr *)&si_other, slen);
 	}
 	writeFile(destinationFile, buffer, packetNum);
+	
 	/* Release memory */
 	for (int i = 0; i < receiveBuffer; i++) {
     	if (buffer[i])
