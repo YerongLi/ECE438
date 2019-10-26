@@ -15,6 +15,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <limits.h>
 
 typedef unsigned long long int ull;
 typedef unsigned short int us;
@@ -29,8 +30,7 @@ typedef struct {
 } segment;
 
 /* Parameters */
-ull nextByteExpected = 1;
-
+ull nextByteExpected = 0;
 
 void diep(char *s);
 void writeFile(char* destinationFile, segment** buffer, ull packetNum);
@@ -52,63 +52,69 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
         diep("bind");
 
 	/* Now receive data and send acknowledgements */
-    segment* buffer[receiveBuffer] = {NULL};
-    ull packetNum = 0;
+    segment* buffer[receiveBuffer];
+    for (int i = 0; i < receiveBuffer; i++)
+    	buffer[i] = NULL;
+    ull packetNum = INT_MAX;
 	while (1) {
     	segment packet;
-		recvfrom(s, &packet, sizeof(packet), 0,
+		recvfrom(s, &packet, sizeof(segment), 0,
 			(struct sockaddr *)&si_other, &slen);
 		ull seqNum = packet.seqNum;
-		if (seqNum == nextByteExpected)
-			nextByteExpected++;
-		if (!buffer[seqNum]) {
+		printf("seqNum = %lld, nextByteExpected = %lld\n",
+			seqNum, nextByteExpected);
+		if (!buffer[seqNum]) { // duplicate ACK
 			segment* cur = malloc(sizeof(segment));
-			cur->seqNum = packet.seqNum;
-			cur->length = packet.length;
+			cur->seqNum = seqNum;
+			ull numbytes = packet.length;
+			cur->length = numbytes;
 			cur->end = packet.end;
-			cur->data = packet.data;
+			strncpy(cur->data, packet.data, payload+1);
+			cur->data[numbytes] = '\0';
 			buffer[seqNum] = cur;
 		}
+		while (buffer[nextByteExpected])
+			nextByteExpected++;
+		sendto(s, &nextByteExpected, sizeof(ull), 0,
+			(struct sockaddr *)&si_other, slen);
 		if (packet.end == '1')
-			packetNum = seqNum;
-		if (packetNum && nextByteExpected > packetNum)
+			packetNum = seqNum+1;
+		if (nextByteExpected == packetNum)
 			break;
 	}
-	// ull numbytes, total = 0;
-	// while (recvfrom(s, &packet, sizeof(packet), 0,
-	// (struct sockaddr *)&si_other, &slen)) {
-	// 	FILE* fp = fopen(destinationFile, "a+");
-	// 	numbytes = packet.length;
-	// 	packet.data[numbytes] = '\0';
-	// 	total += numbytes;
-	// 	fwrite(packet.data, 1, numbytes, fp);
-	// 	// printf("File written, cumulative %lld bytes.\n", total);
-	// 	fclose(fp);
-	// 	if (packet.end == '1')
-	// 		break;
-	// }
+	
+	/* Close connection */
+	for (int i = 0; i < 20; i++) {
+		sendto(s, &nextByteExpected, sizeof(ull), 0,
+			(struct sockaddr *)&si_other, slen);
+	}
 	writeFile(destinationFile, buffer, packetNum);
+	/* Release memory */
+	for (int i = 0; i < receiveBuffer; i++) {
+    	if (buffer[i])
+    		free(buffer[i]);
+	}
     close(s);
-	printf("%s received.\n", destinationFile);
+	printf("%s received\n", destinationFile);
     return;
 }
 
-void diep(char *s) {
-    perror(s);
-    exit(1);
-}
-
-void writeFile(char* destinationFile, segment** buffer, int packetNum) {
+void writeFile(char* destinationFile, segment** buffer, ull packetNum) {
 	FILE* fp = fopen(destinationFile, "w");
 	ull total = 0;
-	for (int i = 1; i <= packetNum; i++) {
+	for (ull i = 0; i < packetNum; i++) {
 		segment* packet = buffer[i];
 		ull length = packet->length;
 		total += length;
 		fwrite(packet->data, 1, length, fp);
 	}
 	fclose(fp);
-	printf("File written, total %lld bytes.\n", total);
+	printf("File written, total %lld bytes\n", total);
+}
+
+void diep(char *s) {
+    perror(s);
+    exit(1);
 }
 
 int main(int argc, char** argv) {

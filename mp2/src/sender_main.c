@@ -40,6 +40,7 @@ socklen_t slen;
 
 /* Parameters shared by 2 threads */
 segment** packetBuffer;
+int packetNum;
 enum Congestion_Control{SS, CA, FR};
 int mode = SS;
 int dupACKcount = 0;
@@ -47,13 +48,13 @@ int timeOutInterval = 50; // 50ms
 ull ssthresh = 1000;
 ull MSS = 10;
 ull cwnd = 10;
-ull sendBase = 1;
-ull nextSeqNum = 1;
+ull sendBase = 0;
+ull nextSeqNum = 0;
 sem_t mutex;
 
 void diep(char* s);
 ull readSize(char* filename, ull bytesToTransfer);
-void storeFile(char* filename, int packetNum, ull actualBytes);
+void storeFile(char* filename, ull actualBytes);
 void* threadRecvRetransmit();
 
 void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesToTransfer) {
@@ -69,37 +70,38 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
 
     /* Open file and store data into packet_buffer */
     ull actualBytes = readSize(filename, bytesToTransfer);
-    int packetNum = ceil(actualBytes/(float)payload);
-    packetBuffer = malloc((packetNum+1) * sizeof(segment*));
-    storeFile(filename, packetNum, actualBytes);
+    packetNum = ceil(actualBytes/(float)payload);
+    packetBuffer = malloc(packetNum * sizeof(segment*));
+    storeFile(filename, actualBytes);
 
 	/* Send data and receive acknowledgements on s */
-	for (int i = 1; i <= packetNum; i++) {
-		segment* packet = packetBuffer[i];
-		sendto(s, packet, sizeof(segment), 0,
-			(struct sockaddr *)&si_other, slen);
-	}
-	// pthread_t recvThread;
-	// sem_init(&mutex, 0, 1);
-	// while (1) {
-	// 	if (nextSeqNum > packetNum)
-	// 		break;
-	// 	sem_wait(&mutex);
-	// 	ull wnEnd = sendBase + cwnd;
-	// 	sem_post(&mutex);
-	// 	while (nextSeqNum <= packetNum && nextSeqNum < wnEnd) {
-	// 		segment* packet = packetBuffer[nextSeqNum];
-	// 		sendto(s, packet, sizeof(*packet), 0,
-	// 			(struct sockaddr *)&si_other, slen);
-	// 		if (nextSeqNum == 1)
-	// 			pthread_create(&recvThread, NULL, threadRecvRetransmit, NULL);
-	// 		nextSeqNum++;
-	// 	}
+	// for (int i = 0; i < packetNum; i++) {
+	// 	segment* packet = packetBuffer[i];
+	// 	sendto(s, packet, sizeof(segment), 0,
+	// 		(struct sockaddr *)&si_other, slen);
 	// }
-	// pthread_join(recvThread, NULL);
-    printf("%lld bytes sent.\n", actualBytes);
+	pthread_t recvThread;
+	sem_init(&mutex, 0, 1);
+	while (1) {
+		if (nextSeqNum == packetNum)
+			break;
+		sem_wait(&mutex);
+		ull wnEnd = sendBase + cwnd;
+		sem_post(&mutex);
+		while (nextSeqNum < packetNum && nextSeqNum < wnEnd) {
+			segment* packet = packetBuffer[nextSeqNum];
+			sendto(s, packet, sizeof(segment), 0,
+				(struct sockaddr *)&si_other, slen);
+			nextSeqNum++;
+			if (nextSeqNum == 1)
+				pthread_create(&recvThread, NULL, threadRecvRetransmit, NULL);
+		}
+	}
+	pthread_join(recvThread, NULL);
+    printf("%lld bytes sent\n", actualBytes);
+    
     /* Release memory */
-	for (int i = 1; i <= packetNum; i++)
+	for (int i = 0; i < packetNum; i++)
 		free(packetBuffer[i]);
 	free(packetBuffer);
 	sem_destroy(&mutex);
@@ -114,8 +116,8 @@ void* threadRecvRetransmit() {
     timeout.tv_usec = timeOutInterval * 1000;
     setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     while (1) {
-    	int ack;
-    	int numbytes = recvfrom(s, &ack, sizeof(ack), 0,
+    	ull ack;
+    	int numbytes = recvfrom(s, &ack, sizeof(ull), 0,
     		(struct sockaddr *)&si_other, &slen);
     	if (numbytes == -1) {
     		/* Timeout */
@@ -130,7 +132,8 @@ void* threadRecvRetransmit() {
 			dupACKcount = 0;
 			continue;
     	}
-    	if (ack == 0)
+    	printf("Received ack = %lld\n", ack);
+    	if (ack == packetNum)
     		break;
     	if (mode == SS) { // Slow start
     		if (ack == sendBase) {
@@ -185,14 +188,14 @@ void* threadRecvRetransmit() {
     return NULL;
 }
 
-void storeFile(char* filename, int packetNum, ull actualBytes) {
+void storeFile(char* filename, ull actualBytes) {
 	FILE *fp;
     fp = fopen(filename, "rb");
     ull read = 0;
-    for (ull i = 1; i <= packetNum; i++) {
+    for (ull i = 0; i < packetNum; i++) {
     	segment* packet = malloc(sizeof(segment));
     	packet->seqNum = i;
-    	if (i != packetNum) {
+    	if (i != packetNum-1) {
     		packet->length = payload;
     		read += payload;
     		packet->end = '0';
@@ -218,7 +221,7 @@ ull readSize(char* filename, ull bytesToTransfer) {
     printf("fileSize = %lld\n", fileSize);
     if (bytesToTransfer > fileSize) {
         actualBytes = fileSize;
-        printf("bytesToTransfer too large, use actual bytes %lld.\n", actualBytes);
+        printf("bytesToTransfer too large, use actual bytes %lld\n", actualBytes);
     } else
         actualBytes = bytesToTransfer;
     fclose(fp);
