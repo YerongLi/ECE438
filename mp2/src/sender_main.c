@@ -95,7 +95,11 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
 				packetBuffer[i]->end = '0';
 			} else {
 				packetBuffer[i]->length = bufbytes - read;
-				packetBuffer[i]->end = '1';
+				if (start + MAXBUFLEN >= packetNum) {
+					packetBuffer[i]->end = '2';
+				} else {
+					packetBuffer[i]->end = '1';
+				}
 			}
 			fread(packetBuffer[i]->data, 1, packetBuffer[i]->length, fp);
     		packetBuffer[i]->data[packetBuffer[i]->length] = '\0';
