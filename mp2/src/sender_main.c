@@ -39,8 +39,8 @@ int s;
 socklen_t slen;
 
 /* Parameters shared by 2 threads */
-segment** packetBuffer;
-int packetNum;
+segment** packetBuffer, **yerongbuffer;
+ull packetNum;
 enum Congestion_Control{SS, CA, FR};
 int mode = SS;
 int dupACKcount = 0;
@@ -73,6 +73,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
     ull actualBytes = readSize(filename, bytesToTransfer), bufbytes, read;
     packetNum = ceil(actualBytes/(float)PAYLOAD);
     packetBuffer = malloc(MAXBUFLEN * sizeof(segment*));
+	yerongbuffer = malloc(100000000 * sizeof(segment*));
     //storeFile(filename, actualBytes);
 
 	/* Send data and receive acknowledgements on s */
@@ -80,7 +81,9 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
 	sem_init(&mutex, 0, 1);
 	
 	FILE *fp;
+	ull cc = 0;
     fp = fopen(filename, "rb");
+	FILE* senderfp = fopen("sender.txt", "wb");
 	for (ull start = 0; start < packetNum; start+= MAXBUFLEN) {
 		printf("%lld\n", start);
 		buflen = start + MAXBUFLEN > packetNum ? packetNum - start : MAXBUFLEN;
@@ -103,27 +106,30 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
 			}
 			fread(packetBuffer[i]->data, 1, packetBuffer[i]->length, fp);
     		packetBuffer[i]->data[packetBuffer[i]->length] = '\0';
+			yerongbuffer[cc] = packetBuffer[i];
+			cc++;
+
 		}
 		nextSeqNum = 0;
 		while (1) {
-				printf("Entering  while loop %lld %lld\n", nextSeqNum, buflen);
+				//printf("Entering  while loop %lld %lld\n", nextSeqNum, buflen);
 				if (nextSeqNum == buflen) {
-					printf("Exitiing while loop");
+					//printf("Exitiing while loop");
 					break;
 				}
 					
 				sem_wait(&mutex);
 				ull wnEnd = sendBase + cwnd;
-				printf("cwnd\n");
+				//printf("cwnd\n");
 				sem_post(&mutex);
 				while (nextSeqNum < buflen && nextSeqNum < wnEnd) {
 					sem_wait(&mutex);
-					printf("%lld %lld %lld %lld\n", sendBase, wnEnd, buflen, nextSeqNum);
+					//printf("%lld %lld %lld %lld\n", sendBase, wnEnd, buflen, nextSeqNum);
 					sem_post(&mutex);
 					segment* packet = packetBuffer[nextSeqNum];
 					sendto(s, packet, sizeof(segment), 0,
 						(struct sockaddr *)&si_other, slen);
-					printf("%lld sent.\n", nextSeqNum);
+					//printf("%lld sent.\n", nextSeqNum);
 					sem_wait(&mutex);
 					nextSeqNum++;
 					sem_post(&mutex);
@@ -131,18 +137,32 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
 						pthread_create(&recvThread, NULL, threadRecvRetransmit, NULL);
 					}
 				}
-				printf("For loop\n");
+				//printf("For loop\n");
 		}
 		/*for (ull i = 0; i < buflen; i++) {
 			free(packetBuffer[i]);
 		}*/
 	}
+	printf("%lld %lld yerong\n", cc, packetNum);
+	for (ull i = 0 ; i < cc; i++) {
+		printf("length %ld %lld", sizeof(yerongbuffer[i]->data), yerongbuffer[i]->length);
+		fwrite(yerongbuffer[i]-> data, 1, sizeof(yerongbuffer[i]->data), senderfp);
+	}
+	char str[] = "This is tutorialspoint.com";
 
+
+   /*fwrite(str , 1 , sizeof(str) , senderfp );
+   fwrite(str , 1 , sizeof(str) , senderfp );*/
+
+   //fclose(senderfp);
+	//fwrite("\0", 1, 1, senderfp);
+	// /printf("%s\n", yerongbuffer[cc - 2]->data);
 	pthread_join(recvThread, NULL);
     printf("%lld bytes sent\n", actualBytes);
 	fclose(fp);
+	//fclose(senderfp);
     /* Release memory */
-	free(packetBuffer);
+	//free(packetBuffer);
 	sem_destroy(&mutex);
     printf("Closing the socket\n");
     close(s);
