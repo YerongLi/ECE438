@@ -71,18 +71,16 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
 		if (packet.seqNum == -1) {
 			diep("Reciever package sequence number");
 		}
+		
+
 		if (0 == received[packet.seqNum]) {
 			received[packet.seqNum] = 1;
-			while (1 == received[expectNum])  {
-				expectNum++;
-			}
 			packet.data[packet.length] = '\0';
 			total += packet.length;
-			ack = expectNum - 1;
+
 			buffer[packet.seqNum] = packet;
-			sendto(s, &ack, sizeof(int), 0,
-             (struct sockaddr *)&si_other, slen);
-			 if (packet.end > 0 && packet.seqNum < expectNum) {
+
+			 if (packet.end > 0 && packet.seqNum == expectNum) {
 				fp = fopen(destinationFile, "a+");
 				for (int i = 1; i < expectNum; i++) {
 					fwrite(buffer[i].data, sizeof(char), buffer[i].length, fp);
@@ -102,9 +100,12 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
 				}
 			 }
 		}
-		if (0) {
-
+		while (1 == received[expectNum])  {
+				expectNum++;
 		}
+		sendto(s, &expectNum, sizeof(int), 0,
+             (struct sockaddr *)&si_other, slen);
+
 
 
 	//	strcpy(buffer + packet.seqNum, packet.data);
