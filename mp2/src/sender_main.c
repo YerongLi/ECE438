@@ -25,12 +25,13 @@
 typedef unsigned long long int ull;
 typedef unsigned short int us;
 #define payload 1400
+#define MSS 5
 
 typedef struct {
 	ull seqNum;
 	ull length;
 	char end;
-	char data[payload+1];
+	char data[payload];
 } segment;
 
 /* Socket parameters*/
@@ -45,12 +46,12 @@ enum Congestion_Control{SS, CA, FR};
 int mode = SS;
 int dupACKcount = 0;
 int timeOutInterval = 50; // 50ms
-int ssthresh = 1000;
-const int MSS = 10;
-double cwnd = 10;
+double ssthresh = 100;
+double cwnd = MSS;
 ull sendBase = 0;
 ull nextSeqNum = 0;
 sem_t mutex;
+ull packetResent = 0;
 
 void diep(char* s);
 ull readSize(char* filename, ull bytesToTransfer);
@@ -75,6 +76,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
     storeFile(filename, actualBytes);
 
 	/* Send data and receive acknowledgements on s */
+	clock_t start = clock();
 	pthread_t recvThread;
 	sem_init(&mutex, 0, 1);
 	while (1) {
@@ -87,13 +89,16 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
 			segment* packet = packetBuffer[nextSeqNum];
 			sendto(s, packet, sizeof(segment), 0,
 				(struct sockaddr *)&si_other, slen);
+			printf("Message %lld sent from main thread\n", nextSeqNum);
 			nextSeqNum++;
 			if (nextSeqNum == 1)
 				pthread_create(&recvThread, NULL, threadRecvRetransmit, NULL);
 		}
 	}
 	pthread_join(recvThread, NULL);
-    printf("%lld bytes sent\n", actualBytes);
+	clock_t end = clock();
+	double timeUsed = ((double)(end-start))/CLOCKS_PER_SEC;
+    printf("%lld bytes sent, total time %.3f, %lld packet resent\n", actualBytes, timeUsed, packetResent);
 
     /* Release memory */
 	for (int i = 0; i < packetNum; i++)
@@ -116,8 +121,10 @@ void* threadRecvRetransmit() {
     		(struct sockaddr *)&si_other, &slen);
     	if (numbytes == -1) { // Timeout
     		segment* packet = packetBuffer[sendBase];
+    		printf("Timeout! base=%lld, Resend packet with seqNum=%lld\n", sendBase, packet->seqNum);
 			sendto(s, packet, sizeof(segment), 0,
 				(struct sockaddr *)&si_other, slen);
+			packetResent++;
 			mode = SS;
 			ssthresh = cwnd / 2;
 			sem_wait(&mutex);
@@ -126,7 +133,7 @@ void* threadRecvRetransmit() {
 			dupACKcount = 0;
 			continue;
     	}
-    	printf("Received ack = %lld, cwnd = %f\n", ack, cwnd);
+    	printf("ack=%lld, base=%lld, seq=%lld, mode=%d, cwnd=%.3f, thresh=%.3f, dup=%d\n", ack, sendBase, nextSeqNum, mode, cwnd, ssthresh, dupACKcount);
     	if (ack == packetNum)
     		break;
     	if (mode == SS) { // Slow start
@@ -138,6 +145,10 @@ void* threadRecvRetransmit() {
     				sem_wait(&mutex);
 					cwnd = MSS;
 					sem_post(&mutex);
+					segment* packet = packetBuffer[sendBase];
+					sendto(s, packet, sizeof(segment), 0,
+						(struct sockaddr *)&si_other, slen);
+					packetResent++;
     			}
     		} else if (ack > sendBase) {
     			sem_wait(&mutex);
@@ -157,6 +168,10 @@ void* threadRecvRetransmit() {
     				sem_wait(&mutex);
 					cwnd = MSS;
 					sem_post(&mutex);
+					segment* packet = packetBuffer[sendBase];
+					sendto(s, packet, sizeof(segment), 0,
+						(struct sockaddr *)&si_other, slen);
+					packetResent++;
     			}
     		} else if (ack > sendBase) {
     			sem_wait(&mutex);
@@ -171,6 +186,7 @@ void* threadRecvRetransmit() {
 				cwnd += MSS * MSS / cwnd;
 				sem_post(&mutex);
     		} else if (ack > sendBase) {
+    			mode = CA;
     			sem_wait(&mutex);
     			sendBase = ack;
 				cwnd = ssthresh;
@@ -198,7 +214,6 @@ void storeFile(char* filename, ull actualBytes) {
     		packet->end = '1';
     	}
     	fread(packet->data, 1, packet->length, fp);
-    	packet->data[packet->length] = '\0';
     	packetBuffer[i] = packet;
     }
 }
@@ -228,18 +243,14 @@ void diep(char* s) {
 }
 
 int main(int argc, char** argv) {
-
     us udpPort;
     ull numBytes;
-
     if (argc != 5) {
         fprintf(stderr, "usage: %s receiver_hostname receiver_port filename_to_xfer bytes_to_xfer\n\n", argv[0]);
         exit(1);
     }
     udpPort = (us) atoi(argv[2]);
     numBytes = atoll(argv[4]);
-
     reliablyTransfer(argv[1], udpPort, argv[3], numBytes);
-
     return (EXIT_SUCCESS);
 }

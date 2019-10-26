@@ -20,17 +20,17 @@
 typedef unsigned long long int ull;
 typedef unsigned short int us;
 #define payload 1400
+#define receiveBuffer 20000
 
 typedef struct {
 	ull seqNum;
 	ull length;
 	char end;
-	char data[payload+1];
+	char data[payload];
 } segment;
 
 /* Parameters */
 ull nextByteExpected = 0;
-const int receiveBuffer = 50000;
 
 void diep(char *s);
 void writeFile(char* destinationFile, segment** buffer, ull packetNum);
@@ -68,8 +68,7 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
 			ull numbytes = packet.length;
 			cur->length = numbytes;
 			cur->end = packet.end;
-			strncpy(cur->data, packet.data, payload+1);
-			cur->data[numbytes] = '\0';
+			memcpy(cur->data, packet.data, payload);
 			buffer[seqNum] = cur;
 		}
 		while (buffer[nextByteExpected])
@@ -88,7 +87,7 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
 			(struct sockaddr *)&si_other, slen);
 	}
 	writeFile(destinationFile, buffer, packetNum);
-	
+
 	/* Release memory */
 	for (int i = 0; i < receiveBuffer; i++) {
     	if (buffer[i])
@@ -100,7 +99,7 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
 }
 
 void writeFile(char* destinationFile, segment** buffer, ull packetNum) {
-	FILE* fp = fopen(destinationFile, "w");
+	FILE* fp = fopen(destinationFile, "wb");
 	ull total = 0;
 	for (ull i = 0; i < packetNum; i++) {
 		segment* packet = buffer[i];
@@ -118,16 +117,13 @@ void diep(char *s) {
 }
 
 int main(int argc, char** argv) {
-
+	printf("segment size: %zu\n", sizeof(segment));
     us udpPort;
-
     if (argc != 3) {
         fprintf(stderr, "usage: %s UDP_port filename_to_write\n\n", argv[0]);
         exit(1);
     }
-
     udpPort = (us) atoi(argv[1]);
-
     reliablyReceive(udpPort, argv[2]);
 }
 
