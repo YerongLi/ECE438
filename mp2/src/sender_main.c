@@ -17,8 +17,8 @@
 
 typedef unsigned long long int ull;
 typedef unsigned short int us;
-#define payload 1450
-#define cwndRatio 0.8
+#define payload 6000
+#define cwndRatio 0.4
 #define inc 3
 
 typedef struct {
