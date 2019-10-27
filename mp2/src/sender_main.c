@@ -17,8 +17,8 @@
 
 typedef unsigned long long int ull;
 typedef unsigned short int us;
-#define payload 6000
-#define cwndRatio 0.5
+#define payload 1450
+#define cwndRatio 0.8
 #define inc 3
 
 typedef struct {
@@ -39,7 +39,7 @@ int packetNum;
 enum Congestion_Control{SS, CA, FR};
 int mode = SS;
 int dupACKcount = 0;
-int timeOutInterval = 22; // ms
+int timeOutInterval = 25; // ms
 double ssthresh = 100;
 double cwnd = inc;
 ull sendBase = 0;

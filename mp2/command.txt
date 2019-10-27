@@ -5,12 +5,14 @@ sudo tc qdisc add dev enp0s3 root handle 1:0 netem delay 20ms loss 5%
 sudo tc qdisc add dev enp0s3 parent 1:1 handle 10: tbf rate 40Mbit burst 10mb latency 1ms
 
 sudo tc qdisc show dev enp0s3
+
 ------------------------------------------------------------------------------------------------------
+make clean
+
+git pull
+
 ./reliable_sender 192.168.0.10 1600 seg.txt 100000000
 
-./reliable_receiver 1600 out
-------------------------------------------------------------------------------------------------------
-http://cs438fa19.csl.illinois.edu:8080/queue/queue.html
 ------------------------------------------------------------------------------------------------------
 rm out
 
@@ -20,4 +22,7 @@ git commit -m "try"
 
 git push
 
-git pull
+./reliable_receiver 1600 out
+
+------------------------------------------------------------------------------------------------------
+http://cs438fa19.csl.illinois.edu:8080/queue/queue.html
