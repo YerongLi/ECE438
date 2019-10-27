@@ -1,10 +1,3 @@
-/* 
- * File:   receiver_main.c
- * Author: 
- *
- * Created on
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,7 +13,7 @@
 typedef unsigned long long int ull;
 typedef unsigned short int us;
 #define payload 1400
-#define receiveBuffer 20000
+#define receiveBuffer 80000
 
 typedef struct {
 	ull seqNum;
@@ -61,7 +54,7 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
 		recvfrom(s, &packet, sizeof(segment), 0,
 			(struct sockaddr *)&si_other, &slen);
 		ull seqNum = packet.seqNum;
-		printf("seqNum = %lld, nextByteExpected = %lld\n", seqNum, nextByteExpected);
+		// printf("seqNum = %lld, nextByteExpected = %lld\n", seqNum, nextByteExpected);
 		if (!buffer[seqNum]) { // duplicate ACK
 			segment* cur = malloc(sizeof(segment));
 			cur->seqNum = seqNum;
@@ -126,4 +119,3 @@ int main(int argc, char** argv) {
     udpPort = (us) atoi(argv[1]);
     reliablyReceive(udpPort, argv[2]);
 }
-
