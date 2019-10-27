@@ -14,7 +14,7 @@ using namespace std;
 
 typedef unsigned long long int ull;
 typedef unsigned short int us;
-#define payload 7000
+#define payload 6500
 
 typedef struct {
 	ull seqNum;
