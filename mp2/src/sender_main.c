@@ -17,7 +17,9 @@
 
 typedef unsigned long long int ull;
 typedef unsigned short int us;
-#define payload 1400
+#define payload 6000
+#define cwndRatio 0.8
+#define inc 1
 
 typedef struct {
     ull seqNum;
@@ -38,21 +40,20 @@ enum Congestion_Control{SS, CA, FR};
 int mode = SS;
 int dupACKcount = 0;
 int timeOutInterval = 25; // ms
-double ssthresh = 200;
-double cwnd = 1;
+double ssthresh = 100;
+double cwnd = inc;
 ull sendBase = 0;
 ull nextSeqNum = 0;
 ull packetResent = 0;
 ull timeOutNum = 0;
-ull haveRest = 0;
 /* sendBase and cwnd are shared by 2 threads, but in thread 1 they are only read.
 And they are only changed in thread 2, so in thread 2 only write need mutex */
 sem_t mutex;
 
-void diep(char* s);
+void diep(const char* s);
 ull readSize(char* filename, ull bytesToTransfer);
 void storeFile(char* filename, ull actualBytes);
-void* threadRecvRetransmit();
+void* threadRecvRetransmit(void*);
 
 void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesToTransfer) {
     /* Open socket */
@@ -68,7 +69,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
     /* Open file and store data into packet_buffer */
     ull actualBytes = readSize(filename, bytesToTransfer);
     packetNum = ceil(actualBytes/(float)payload);
-    packetBuffer = malloc(packetNum * sizeof(segment*));
+    packetBuffer = (segment**)malloc(packetNum * sizeof(segment*));
     storeFile(filename, actualBytes);
 
     /* Send data and receive acknowledgements on s */
@@ -87,9 +88,6 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
                 (struct sockaddr *)&si_other, slen);
             // printf("Message %lld sent from main thread\n", nextSeqNum);
             nextSeqNum++;
-            sem_wait(&mutex);
-            haveRest++;
-            sem_post(&mutex);
             if (nextSeqNum == 1)
                 pthread_create(&recvThread, NULL, threadRecvRetransmit, NULL);
         }
@@ -97,8 +95,8 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
     pthread_join(recvThread, NULL);
     clock_t end = clock();
     double timeUsed = ((double)(end-start))/CLOCKS_PER_SEC;
-    printf("%lld bytes sent, total time %.3f\n", actualBytes, timeUsed);
-    printf("total %d packets, %lld packets resent, %lld timeout\n", packetNum, packetResent, timeOutNum);
+    printf("%lld bytes sent, total %d packets, total time %.3f\n", actualBytes, packetNum, timeUsed);
+    printf("total %lld packets resent, %lld timeout\n", packetResent, timeOutNum);
 
     /* Release memory */
     for (int i = 0; i < packetNum; i++)
@@ -110,21 +108,13 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
     return;
 }
 
-void* threadRecvRetransmit() {
+void* threadRecvRetransmit(void*) {
     struct timeval timeout;      
     timeout.tv_sec = 0;
     timeout.tv_usec = timeOutInterval * 1000;
     setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     while (1) {
         /* TCP friendliness */
-        sem_wait(&mutex);
-        if(haveRest > 20000){
-            haveRest = 0;
-            mode = SS;
-            cwnd = 1;
-            ssthresh = 200;
-        }
-        sem_post(&mutex);
         ull ack;
         int numbytes = recvfrom(s, &ack, sizeof(ull), 0,
             (struct sockaddr *)&si_other, &slen);
@@ -136,9 +126,9 @@ void* threadRecvRetransmit() {
                 (struct sockaddr *)&si_other, slen);
             packetResent++;
             mode = SS;
-            ssthresh = cwnd / 2;
+            ssthresh = cwnd * cwndRatio;
             sem_wait(&mutex);
-            cwnd = 1;
+            cwnd = inc;
             sem_post(&mutex);
             dupACKcount = 0;
             continue;
@@ -151,7 +141,7 @@ void* threadRecvRetransmit() {
                 dupACKcount++;
                 if (dupACKcount == 3) {
                     mode = FR;
-                    ssthresh = cwnd / 2;
+                    ssthresh = cwnd * cwndRatio;
                     sem_wait(&mutex);
                     cwnd = ssthresh + 3;
                     sem_post(&mutex);
@@ -163,7 +153,7 @@ void* threadRecvRetransmit() {
             } else if (ack > sendBase) {
                 sem_wait(&mutex);
                 sendBase = ack;
-                cwnd += 1;
+                cwnd += inc;
                 sem_post(&mutex);
                 dupACKcount = 0;
                 if (cwnd >= ssthresh)
@@ -174,7 +164,7 @@ void* threadRecvRetransmit() {
                 dupACKcount++;
                 if (dupACKcount == 3) {
                     mode = FR;
-                    ssthresh = cwnd / 2;
+                    ssthresh = cwnd * cwndRatio;
                     sem_wait(&mutex);
                     cwnd = ssthresh + 3;
                     sem_post(&mutex);
@@ -186,7 +176,7 @@ void* threadRecvRetransmit() {
             } else if (ack > sendBase) {
                 sem_wait(&mutex);
                 sendBase = ack;
-                cwnd += 1 / cwnd;
+                cwnd += inc / cwnd;
                 sem_post(&mutex);
                 dupACKcount = 0;
             }
@@ -194,7 +184,7 @@ void* threadRecvRetransmit() {
             if (ack == sendBase) {
                 dupACKcount++;
                 sem_wait(&mutex);
-                cwnd += 1 / cwnd;
+                cwnd += inc / cwnd;
                 sem_post(&mutex);
             } else if (ack > sendBase) {
                 mode = CA;
@@ -214,7 +204,7 @@ void storeFile(char* filename, ull actualBytes) {
     fp = fopen(filename, "rb");
     ull read = 0;
     for (ull i = 0; i < packetNum; i++) {
-        segment* packet = malloc(sizeof(segment));
+        segment* packet = (segment*)malloc(sizeof(segment));
         packet->seqNum = i;
         if (i != packetNum-1) {
             packet->length = payload;
@@ -248,7 +238,7 @@ ull readSize(char* filename, ull bytesToTransfer) {
     return actualBytes;
 }
 
-void diep(char* s) {
+void diep(const char* s) {
     perror(s);
     exit(1);
 }

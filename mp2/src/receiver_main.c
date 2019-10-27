@@ -9,11 +9,12 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <limits.h>
+#include <unordered_map>
+using namespace std;
 
 typedef unsigned long long int ull;
 typedef unsigned short int us;
-#define payload 1400
-#define receiveBuffer 80000
+#define payload 7000
 
 typedef struct {
 	ull seqNum;
@@ -24,9 +25,12 @@ typedef struct {
 
 /* Parameters */
 ull nextByteExpected = 0;
+FILE* fp;
+ull total = 0;
+unordered_map<ull, segment*> buffer;
 
-void diep(char *s);
-void writeFile(char* destinationFile, segment** buffer, ull packetNum);
+void diep(const char *s);
+void writeFile(ull packetNum);
 
 void reliablyReceive(us myUDPport, char* destinationFile) {
 	/* Open socket and bind */
@@ -44,10 +48,8 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
     if (bind(s, (struct sockaddr*)&si_me, sizeof (si_me)) == -1)
         diep("bind");
 
-	/* Now receive data and send acknowledgements */
-    segment* buffer[receiveBuffer];
-    for (int i = 0; i < receiveBuffer; i++)
-    	buffer[i] = NULL;
+    /* Receive file */
+	fp = fopen(destinationFile, "wb");
     ull packetNum = INT_MAX;
 	while (1) {
     	segment packet;
@@ -55,8 +57,8 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
 			(struct sockaddr *)&si_other, &slen);
 		ull seqNum = packet.seqNum;
 		// printf("seqNum = %lld, nextByteExpected = %lld\n", seqNum, nextByteExpected);
-		if (!buffer[seqNum]) { // duplicate ACK
-			segment* cur = malloc(sizeof(segment));
+		if (!buffer.count(seqNum)) { // new ACK
+			segment* cur = (segment*)malloc(sizeof(segment));
 			cur->seqNum = seqNum;
 			ull numbytes = packet.length;
 			cur->length = numbytes;
@@ -64,8 +66,10 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
 			memcpy(cur->data, packet.data, payload);
 			buffer[seqNum] = cur;
 		}
-		while (buffer[nextByteExpected])
+		while (buffer.count(nextByteExpected)) {
+			writeFile(nextByteExpected);
 			nextByteExpected++;
+		}
 		sendto(s, &nextByteExpected, sizeof(ull), 0,
 			(struct sockaddr *)&si_other, slen);
 		if (packet.end == '1')
@@ -79,32 +83,24 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
 		sendto(s, &nextByteExpected, sizeof(ull), 0,
 			(struct sockaddr *)&si_other, slen);
 	}
-	writeFile(destinationFile, buffer, packetNum);
 
-	/* Release memory */
-	for (int i = 0; i < receiveBuffer; i++) {
-    	if (buffer[i])
-    		free(buffer[i]);
-	}
+	/* End */
+	fclose(fp);
+	printf("File written, total %lld packets, %lld bytes\n", packetNum, total);
     close(s);
 	printf("%s received\n", destinationFile);
     return;
 }
 
-void writeFile(char* destinationFile, segment** buffer, ull packetNum) {
-	FILE* fp = fopen(destinationFile, "wb");
-	ull total = 0;
-	for (ull i = 0; i < packetNum; i++) {
-		segment* packet = buffer[i];
-		ull length = packet->length;
-		total += length;
-		fwrite(packet->data, 1, length, fp);
-	}
-	fclose(fp);
-	printf("File written, total %lld bytes\n", total);
+void writeFile(ull nextByteExpected) {
+	segment* packet = buffer[nextByteExpected];
+	ull length = packet->length;
+	total += length;
+	fwrite(packet->data, 1, length, fp);
+	free(packet);
 }
 
-void diep(char *s) {
+void diep(const char *s) {
     perror(s);
     exit(1);
 }
