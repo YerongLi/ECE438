@@ -25,7 +25,7 @@
 typedef unsigned long long int ull;
 typedef unsigned short int us;
 #define payload 1400
-#define MSS 5
+#define MSS 7
 
 typedef struct {
 	ull seqNum;
@@ -45,13 +45,16 @@ int packetNum;
 enum Congestion_Control{SS, CA, FR};
 int mode = SS;
 int dupACKcount = 0;
-int timeOutInterval = 50; // 50ms
-double ssthresh = 100;
+int timeOutInterval = 25; // ms
+double ssthresh = 200;
 double cwnd = MSS;
 ull sendBase = 0;
 ull nextSeqNum = 0;
-sem_t mutex;
 ull packetResent = 0;
+ull timeOutNum = 0;
+/* sendBase and cwnd are shared by 2 threads, but in thread 1 they are only read.
+And they are only changed in thread 2, so in thread 2 only write need mutex */
+sem_t mutex;
 
 void diep(char* s);
 ull readSize(char* filename, ull bytesToTransfer);
@@ -98,7 +101,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
 	pthread_join(recvThread, NULL);
 	clock_t end = clock();
 	double timeUsed = ((double)(end-start))/CLOCKS_PER_SEC;
-    printf("%lld bytes sent, total time %.3f, %lld packet resent\n", actualBytes, timeUsed, packetResent);
+    printf("%lld bytes sent, total time %.3f, %lld packet resent, %lld timeout\n", actualBytes, timeUsed, packetResent, timeOutNum);
 
     /* Release memory */
 	for (int i = 0; i < packetNum; i++)
@@ -122,6 +125,7 @@ void* threadRecvRetransmit() {
     	if (numbytes == -1) { // Timeout
     		segment* packet = packetBuffer[sendBase];
     		printf("Timeout! base=%lld, Resend packet with seqNum=%lld\n", sendBase, packet->seqNum);
+    		timeOutNum++;
 			sendto(s, packet, sizeof(segment), 0,
 				(struct sockaddr *)&si_other, slen);
 			packetResent++;

@@ -1,0 +1,21 @@
+---9358828 bytes---
+
+loss 0%:
+>>MSS 3, timeout 25: total time 3.215, 157 packet resent, 147 timeout
+>>MSS 3, timeout 50: total time 8.254, 181 packet resent, 167 timeout
+
+loss 5%:
+--change timeout--
+>>MSS 3, timeout 10: total time 10.641, 708 packet resent, 479 timeout
+>>MSS 3, timeout 25: total time 10.813, 321 packet resent, 103 timeout
+>>MSS 3, timeout 50: total time 13.578, 359 packet resent, 125 timeout
+--change MSS--
+>>MSS 1, timeout 25: total time 19.767, 283 packet resent, 76 timeout
+>>MSS 5, timeout 25: total time 8.670, 326 packet resent, 101 timeout
+>>MSS 7, timeout 25: total time 8.228, 342 packet resent, 123 timeout
+>>MSS 10, timeout 25: total time 10.705, 442 packet resent, 259 timeout
+
+----------------------------------------
+timeout bigger: obvious speed diff in different mode, very slow in SS
+
+MSS too large (50): too slow, ssthresh almost not change
