@@ -234,9 +234,9 @@ void timeOutHandler(int) {
     sem_wait(&mutex);
     cwnd = 1;
     timerNum = packet->seqNum;
+    ualarm(timeOutInterval*1000, 0);
     sem_post(&mutex);
     dupACKcount = 0;
-    ualarm(timeOutInterval*1000, 0);
 }
 
 void calculateRTT(struct timespec sendTime) {
