@@ -225,7 +225,7 @@ void* threadRecvRetransmit(void*) {
 void timeOutHandler(int) {
 	timeOutNum++;
     sem_wait(&mutex);
-    segment* packet = packetBuffer[sendBase];
+    segment* packet = packetBuffer[timerNum];
     sem_post(&mutex);
     printf("Timeout! Expect ack of %lld. Resend packet with seqNum=%lld\n", timerNum, packet->seqNum);
     clock_gettime(CLOCK_REALTIME, &packet->sendTime);
@@ -236,7 +236,7 @@ void timeOutHandler(int) {
     ssthresh = cwnd * 0.5;
     sem_wait(&mutex);
     cwnd = 1;
-    timerNum = packet->seqNum;
+    // timerNum = packet->seqNum;
     printf("Timer restart! timerNum=%lld\n", timerNum);
     ualarm(timeOutInterval*1000, 0);
     sem_post(&mutex);
