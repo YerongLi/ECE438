@@ -151,6 +151,7 @@ void* threadRecvRetransmit(void*) {
         if (ackNum > timerNum) {
         	ualarm(0, 0);
         	timerReady = true;
+        	printf("Timer stop, received timerNum=%lld", timerNum);
         }
         sem_post(&mutex);
         printf("ack=%lld, base=%lld, seq=%lld, mode=%d, cwnd=%.3f, thresh=%.3f, dup=%d, interval=%.3f\n"
