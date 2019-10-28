@@ -18,8 +18,8 @@
 typedef unsigned long long int ull;
 typedef unsigned short int us;
 #define payload 1450
-#define cwndRatio 0.8
-#define inc 3
+#define cwndRatio 0.5
+#define inc 1
 
 typedef struct {
     ull seqNum;
@@ -82,7 +82,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
         sem_wait(&mutex);
         ull wnEnd = sendBase + cwnd;
         sem_post(&mutex);
-        if (nextSeqNum < packetNum && nextSeqNum < wnEnd) {
+        while (nextSeqNum < packetNum && nextSeqNum < wnEnd) {
             segment* packet = packetBuffer[nextSeqNum];
             sendto(s, packet, sizeof(segment), 0,
                 (struct sockaddr *)&si_other, slen);
