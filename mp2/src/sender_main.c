@@ -107,6 +107,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
                 (struct sockaddr *)&si_other, slen);
             printf("Message %lld sent from main thread\n", nextSeqNum);
             sem_wait(&mutex);
+            printf("DEBUG\n");
         	if (timerReady) {
         		timerNum = nextSeqNum;
     			printf("Timer restart! timerNum=%lld\n", timerNum);
