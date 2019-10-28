@@ -101,7 +101,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
             clock_gettime(CLOCK_REALTIME, &packet->sendTime);
             sendto(s, packet, sizeof(segment), 0,
                 (struct sockaddr *)&si_other, slen);
-            // printf("Message %lld sent from main thread\n", nextSeqNum);
+            printf("Message %lld sent from main thread\n", nextSeqNum);
             nextSeqNum++;
             if (nextSeqNum == 1)
                 pthread_create(&recvThread, NULL, threadRecvRetransmit, NULL);
@@ -135,7 +135,7 @@ void* threadRecvRetransmit(void*) {
         if (numbytes == -1) { // Timeout
             timeOutNum++;
             segment* packet = packetBuffer[sendBase];
-            // printf("Timeout! Resend packet with seqNum=%lld\n", packet->seqNum);
+            printf("Timeout! Resend packet with seqNum=%lld\n", packet->seqNum);
             clock_gettime(CLOCK_REALTIME, &packet->sendTime);
             sendto(s, packet, sizeof(segment), 0,
                 (struct sockaddr *)&si_other, slen);
@@ -166,7 +166,7 @@ void* threadRecvRetransmit(void*) {
                     clock_gettime(CLOCK_REALTIME, &packet->sendTime);
                     sendto(s, packet, sizeof(segment), 0,
                         (struct sockaddr *)&si_other, slen);
-                    // printf("3 dup! Resend packet with seqNum=%lld\n", packet->seqNum);
+                    printf("3 dup! Resend packet with seqNum=%lld\n", packet->seqNum);
                     packetResent++;
                 }
             } else if (ackNum > sendBase) {
@@ -191,7 +191,7 @@ void* threadRecvRetransmit(void*) {
                     clock_gettime(CLOCK_REALTIME, &packet->sendTime);
                     sendto(s, packet, sizeof(segment), 0,
                         (struct sockaddr *)&si_other, slen);
-                    // printf("3 dup! Resend packet with seqNum=%lld\n", packet->seqNum);
+                    printf("3 dup! Resend packet with seqNum=%lld\n", packet->seqNum);
                     packetResent++;
                 }
             } else if (ackNum > sendBase) {
