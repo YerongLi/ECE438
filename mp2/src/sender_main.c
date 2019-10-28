@@ -118,7 +118,7 @@ void* threadRecvRetransmit(void*) {
         ull ack;
         int numbytes = recvfrom(s, &ack, sizeof(ull), 0,
             (struct sockaddr *)&si_other, &slen);
-        if (numbytes == -1) { // Timeout
+        if (numbytes == -1 && errno == EAGAIN) { // Timeout
             segment* packet = packetBuffer[sendBase];
             printf("Timeout! base=%lld, Resend packet with seqNum=%lld\n", sendBase, packet->seqNum);
             timeOutNum++;
