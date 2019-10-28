@@ -18,7 +18,7 @@
 
 typedef unsigned long long int ull;
 typedef unsigned short int us;
-#define payload 1432
+#define payload 1400
 #define beta 0.25
 #define alpha 0.125
 #define cwndDecay 0.5
