@@ -93,13 +93,14 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
     pthread_t recvThread;
     sem_init(&mutex, 0, 1);
 	/* Retransmit through signal */
-	struct sigaction sa;
-	sa.sa_flags = SA_RESTART;
-	sa.sa_handler = timeOutHandler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-    sigaction(SIGALRM, &sa, NULL);
-    // signal(SIGALRM, timeOutHandler);
+	// struct sigaction sa;
+	// sa.sa_flags = SA_RESTART;
+	// sa.sa_handler = timeOutHandler;
+ //    sigemptyset(&sa.sa_mask);
+ //    sa.sa_flags = 0;
+ //    sigaction(SIGALRM, &sa, NULL);
+    signal(SIGALRM, timeOutHandler);
+    siginterrupt(SIGALRM, 1);
     while (1) {
         if (nextSeqNum == packetNum)
             break;
