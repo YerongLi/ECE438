@@ -1,7 +1,7 @@
 # Use C++ compiler
 CC = g++
 #If you use threads, add -pthread here.
-COMPILERFLAGS = -std=c++11 -g -Wall -Wextra -Wno-sign-compare
+COMPILERFLAGS = -std=c++11 -g -Wall -Wextra -Wno-sign-compare -pthread
 
 #Any libraries you might need linked in.
 LINKLIBS = -lpthread -lm

@@ -39,7 +39,7 @@ int packetNum;
 enum Congestion_Control{SS, CA, FR};
 int mode = SS;
 int dupACKcount = 0;
-int timeOutInterval = 25; // ms
+int timeOutInterval = 100; // ms
 double ssthresh = 100;
 double cwnd = inc;
 ull sendBase = 0;
@@ -118,7 +118,7 @@ void* threadRecvRetransmit(void*) {
         ull ack;
         int numbytes = recvfrom(s, &ack, sizeof(ull), 0,
             (struct sockaddr *)&si_other, &slen);
-        if (numbytes == -1 && errno == EAGAIN) { // Timeout
+        if (numbytes == -1) { // Timeout
             segment* packet = packetBuffer[sendBase];
             printf("Timeout! base=%lld, Resend packet with seqNum=%lld\n", sendBase, packet->seqNum);
             timeOutNum++;
