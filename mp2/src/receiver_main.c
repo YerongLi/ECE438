@@ -22,12 +22,12 @@ typedef struct {
 	ull length;
 	char end;
 	char data[payload];
-    struct timespec startTime;
+    struct timespec sendTime;
 } segment;
 
 typedef struct {
 	ull ackNum;
-    struct timespec startTime;
+    struct timespec sendTime;
 } ACK;
 
 /* Parameters */
@@ -76,7 +76,7 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
 		}
 		ACK ack;
 		ack.ackNum = nextByteExpected;
-		ack.startTime = packet.startTime;
+		ack.sendTime = packet.sendTime;
 		sendto(s, &ack, sizeof(ACK), 0,
 			(struct sockaddr *)&si_other, slen);
 		if (packet.end == '1')
