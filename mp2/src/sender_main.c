@@ -151,7 +151,7 @@ void* threadRecvRetransmit(void*) {
         }
         calculateRTT(ack.sendTime);
         sem_wait(&mutex);
-        if (ackNum > timerNum) {
+        if (timerReady && ackNum > timerNum) {
         	ualarm(0, 0);
         	timerReady = true;
         	printf("Timer stop, received timerNum=%lld\n", timerNum);
