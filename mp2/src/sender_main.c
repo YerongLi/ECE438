@@ -189,12 +189,12 @@ void* threadRecvRetransmit(void*) {
                 sem_wait(&mutex);
                 cwnd += inc;
                 sem_post(&mutex);
-                // if (dupACKcount % 3 == 0) {
-                //     segment* packet = packetBuffer[sendBase];
-                //     sendto(s, packet, sizeof(segment), 0,
-                //         (struct sockaddr *)&si_other, slen);
-                //     packetResent++;
-                // }
+                if (dupACKcount % 3 == 0) {
+                    segment* packet = packetBuffer[sendBase];
+                    sendto(s, packet, sizeof(segment), 0,
+                        (struct sockaddr *)&si_other, slen);
+                    packetResent++;
+                }
             } else if (ack > sendBase) {
                 mode = CA;
                 sem_wait(&mutex);
