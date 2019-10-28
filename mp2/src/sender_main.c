@@ -20,7 +20,7 @@ typedef unsigned short int us;
 #define payload 1450
 #define cwndRatio 0.5
 #define ssStart 1
-#define inc 3
+#define inc 1
 
 typedef struct {
     ull seqNum;
@@ -185,7 +185,7 @@ void* threadRecvRetransmit(void*) {
             if (ack == sendBase) {
                 dupACKcount++;
                 sem_wait(&mutex);
-                cwnd += inc / cwnd;
+                cwnd += inc;
                 sem_post(&mutex);
                 if (dupACKcount % 3 == 0) {
                     segment* packet = packetBuffer[sendBase];
