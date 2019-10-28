@@ -16,7 +16,7 @@ make clean && git pull && make
 ./reliable_sender 192.168.0.10 1600 seg.txt 100000000
 
 ------------------------------------------------------------------------------------------------------
-git add -u && git commit -m "try" && git push && make
+git add . && git commit -m "try" && git push && make
 
 ./reliable_receiver 1600 out
 
