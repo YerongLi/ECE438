@@ -6,6 +6,8 @@ sudo tc qdisc add dev enp0s3 parent 1:1 handle 10: tbf rate 40Mbit burst 10mb la
 
 sudo tc qdisc show dev enp0s3
 
+wlp2s0
+
 ------------------------------------------------------------------------------------------------------
 make clean && git pull && make
 
