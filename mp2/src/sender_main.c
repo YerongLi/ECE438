@@ -19,7 +19,6 @@ typedef unsigned long long int ull;
 typedef unsigned short int us;
 #define payload 1450
 #define cwndRatio 0.5
-#define inc 1
 
 typedef struct {
     ull seqNum;
@@ -41,7 +40,7 @@ int mode = SS;
 int dupACKcount = 0;
 int timeOutInterval = 30; // ms
 double ssthresh = 100;
-double cwnd = inc;
+double cwnd = 1;
 ull sendBase = 0;
 ull nextSeqNum = 0;
 ull packetResent = 0;
@@ -128,7 +127,7 @@ void* threadRecvRetransmit(void*) {
             mode = SS;
             ssthresh = cwnd * cwndRatio;
             sem_wait(&mutex);
-            cwnd = inc;
+            cwnd = 1;
             sem_post(&mutex);
             dupACKcount = 0;
             continue;
@@ -153,7 +152,7 @@ void* threadRecvRetransmit(void*) {
             } else if (ack > sendBase) {
                 sem_wait(&mutex);
                 sendBase = ack;
-                cwnd += inc;
+                cwnd += 1;
                 sem_post(&mutex);
                 dupACKcount = 0;
                 if (cwnd >= ssthresh)
@@ -176,7 +175,7 @@ void* threadRecvRetransmit(void*) {
             } else if (ack > sendBase) {
                 sem_wait(&mutex);
                 sendBase = ack;
-                cwnd += inc / cwnd;
+                cwnd += 1 / cwnd;
                 sem_post(&mutex);
                 dupACKcount = 0;
             }
@@ -184,7 +183,7 @@ void* threadRecvRetransmit(void*) {
             if (ack == sendBase) {
                 dupACKcount++;
                 sem_wait(&mutex);
-                cwnd += inc / cwnd;
+                cwnd += 1 / cwnd;
                 sem_post(&mutex);
                 if (dupACKcount % 3 == 0) {
                     segment* packet = packetBuffer[sendBase];
