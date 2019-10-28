@@ -10,18 +10,25 @@
 #include <pthread.h>
 #include <limits.h>
 #include <unordered_map>
+#include <time.h>
 using namespace std;
 
 typedef unsigned long long int ull;
 typedef unsigned short int us;
-#define payload 1450
+#define payload 1400
 
 typedef struct {
 	ull seqNum;
 	ull length;
 	char end;
 	char data[payload];
+    struct timespec startTime;
 } segment;
+
+typedef struct {
+	ull ackNum;
+    struct timespec startTime;
+} ACK;
 
 /* Parameters */
 ull nextByteExpected = 0;
@@ -59,10 +66,7 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
 		printf("seqNum = %lld, nextByteExpected = %lld\n", seqNum, nextByteExpected);
 		if (!buffer.count(seqNum)) { // new ACK
 			segment* cur = (segment*)malloc(sizeof(segment));
-			cur->seqNum = seqNum;
-			ull numbytes = packet.length;
-			cur->length = numbytes;
-			cur->end = packet.end;
+			cur->length = packet.length;
 			memcpy(cur->data, packet.data, payload);
 			buffer[seqNum] = cur;
 		}
@@ -70,7 +74,10 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
 			writeFile(nextByteExpected);
 			nextByteExpected++;
 		}
-		sendto(s, &nextByteExpected, sizeof(ull), 0,
+		ACK ack;
+		ack.ackNum = nextByteExpected;
+		ack.startTime = packet.startTime;
+		sendto(s, &ack, sizeof(ACK), 0,
 			(struct sockaddr *)&si_other, slen);
 		if (packet.end == '1')
 			packetNum = seqNum+1;
@@ -79,8 +86,10 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
 	}
 
 	/* Close connection */
+	ACK ack;
+	ack.ackNum = nextByteExpected;
 	for (int i = 0; i < 20; i++) {
-		sendto(s, &nextByteExpected, sizeof(ull), 0,
+		sendto(s, &ack, sizeof(ACK), 0,
 			(struct sockaddr *)&si_other, slen);
 	}
 

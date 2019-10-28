@@ -14,20 +14,24 @@
 #include <sys/time.h>
 #include <math.h>
 #include <semaphore.h>
+#include <time.h>
 
 typedef unsigned long long int ull;
 typedef unsigned short int us;
-#define payload 1450
-#define cwndRatio 0.5
-#define ssStart 1
-#define inc 1
+#define payload 1400
 
 typedef struct {
     ull seqNum;
     ull length;
     char end;
     char data[payload];
+    struct timespec startTime;
 } segment;
+
+typedef struct {
+	ull ackNum;
+    struct timespec startTime;
+} ACK;
 
 /* Socket parameters*/
 struct sockaddr_in si_other;
@@ -42,7 +46,7 @@ int mode = SS;
 int dupACKcount = 0;
 int timeOutInterval = 30; // ms
 double ssthresh = 100;
-double cwnd = ssStart;
+double cwnd = 1;
 ull sendBase = 0;
 ull nextSeqNum = 0;
 ull packetResent = 0;
@@ -116,8 +120,8 @@ void* threadRecvRetransmit(void*) {
     setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     while (1) {
         /* TCP friendliness */
-        ull ack;
-        int numbytes = recvfrom(s, &ack, sizeof(ull), 0,
+        ACK ack;
+        int numbytes = recvfrom(s, &ack, sizeof(ACK), 0,
             (struct sockaddr *)&si_other, &slen);
         if (numbytes == -1) { // Timeout
             segment* packet = packetBuffer[sendBase];
@@ -127,22 +131,23 @@ void* threadRecvRetransmit(void*) {
                 (struct sockaddr *)&si_other, slen);
             packetResent++;
             mode = SS;
-            ssthresh = cwnd * cwndRatio;
+            ssthresh = cwnd * 0.5;
             sem_wait(&mutex);
-            cwnd = ssStart;
+            cwnd = 1;
             sem_post(&mutex);
             dupACKcount = 0;
             continue;
         }
-        printf("ack=%lld, base=%lld, seq=%lld, mode=%d, cwnd=%.3f, thresh=%.3f, dup=%d\n", ack, sendBase, nextSeqNum, mode, cwnd, ssthresh, dupACKcount);
-        if (ack == packetNum)
+        ull ackNum = ack.ackNum;
+        printf("ack=%lld, base=%lld, seq=%lld, mode=%d, cwnd=%.3f, thresh=%.3f, dup=%d\n", ackNum, sendBase, nextSeqNum, mode, cwnd, ssthresh, dupACKcount);
+        if (ackNum == packetNum)
             break;
         if (mode == SS) { // Slow start
-            if (ack == sendBase) {
+            if (ackNum == sendBase) {
                 dupACKcount++;
                 if (dupACKcount == 3) {
                     mode = FR;
-                    ssthresh = cwnd * cwndRatio;
+                    ssthresh = cwnd * 0.5;
                     sem_wait(&mutex);
                     cwnd = ssthresh + 3;
                     sem_post(&mutex);
@@ -152,21 +157,21 @@ void* threadRecvRetransmit(void*) {
                     printf("3 dup! Resend packet with seqNum=%lld\n", packet->seqNum);
                     packetResent++;
                 }
-            } else if (ack > sendBase) {
+            } else if (ackNum > sendBase) {
                 sem_wait(&mutex);
-                sendBase = ack;
-                cwnd += inc;
+                sendBase = ackNum;
+                cwnd += 1;
                 sem_post(&mutex);
                 dupACKcount = 0;
                 if (cwnd >= ssthresh)
                     mode = CA;
             }
         } else if (mode == CA) { // Congestion avoidance
-            if (ack == sendBase) {
+            if (ackNum == sendBase) {
                 dupACKcount++;
                 if (dupACKcount == 3) {
                     mode = FR;
-                    ssthresh = cwnd * cwndRatio;
+                    ssthresh = cwnd * 0.5;
                     sem_wait(&mutex);
                     cwnd = ssthresh + 3;
                     sem_post(&mutex);
@@ -176,18 +181,18 @@ void* threadRecvRetransmit(void*) {
                     printf("3 dup! Resend packet with seqNum=%lld\n", packet->seqNum);
                     packetResent++;
                 }
-            } else if (ack > sendBase) {
+            } else if (ackNum > sendBase) {
                 sem_wait(&mutex);
-                sendBase = ack;
-                cwnd += inc / cwnd;
+                sendBase = ackNum;
+                cwnd += 1 / cwnd;
                 sem_post(&mutex);
                 dupACKcount = 0;
             }
         } else { // Fast recovery
-            if (ack == sendBase) {
+            if (ackNum == sendBase) {
                 dupACKcount++;
                 sem_wait(&mutex);
-                cwnd += inc;
+                cwnd += 1;
                 sem_post(&mutex);
                 if (dupACKcount % 3 == 0) {
                     segment* packet = packetBuffer[sendBase];
@@ -195,10 +200,10 @@ void* threadRecvRetransmit(void*) {
                         (struct sockaddr *)&si_other, slen);
                     packetResent++;
                 }
-            } else if (ack > sendBase) {
+            } else if (ackNum > sendBase) {
                 mode = CA;
                 sem_wait(&mutex);
-                sendBase = ack;
+                sendBase = ackNum;
                 cwnd = ssthresh;
                 sem_post(&mutex);
                 dupACKcount = 0;
