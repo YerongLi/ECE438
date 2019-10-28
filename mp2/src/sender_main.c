@@ -54,17 +54,20 @@ ull packetResent = 0;
 ull timeOutNum = 0;
 /* sendBase and cwnd are shared by 2 threads, but in thread 1 they are only read.
 And they are only changed in thread 2, so in thread 2 only write need mutex.
-timeOutInterval is shared by thread 2 and signal handler */
+timeOutInterval, timerNum, timerReady is shared by thread 1, 2 and signal handler */
 sem_t mutex;
 /* Timeout parameters, ms */
 double timeOutInterval = 30;
 double estimatedRTT = 30;
 double devRTT = 0;
+ull timerNum;
+bool timerReady = true;
 
 void diep(const char* s);
 ull readSize(char* filename, ull bytesToTransfer);
 void storeFile(char* filename, ull actualBytes);
 void calculateRTT(struct timespec sendTime);
+void timeOutHandler(int);
 void* threadRecvRetransmit(void*);
 
 void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesToTransfer) {
@@ -85,16 +88,26 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
     storeFile(filename, actualBytes);
 
     /* Send data and receive acknowledgements on s */
-    clock_t start = clock();
+    struct timespec start;
+    clock_gettime(CLOCK_REALTIME, &start);
     pthread_t recvThread;
     sem_init(&mutex, 0, 1);
+	/* Retransmit through signal */
+    signal(SIGALRM, timeOutHandler);
     while (1) {
         if (nextSeqNum == packetNum)
             break;
         sem_wait(&mutex);
         ull wnEnd = sendBase + cwnd;
         sem_post(&mutex);
-        if (nextSeqNum < packetNum && nextSeqNum < wnEnd) {
+        while (nextSeqNum < packetNum && nextSeqNum < wnEnd) {
+        	sem_wait(&mutex);
+        	if (timerReady) {
+        		timerNum = nextSeqNum;
+        		timerReady = false;
+    			ualarm(timeOutInterval*1000, 0);
+        	}
+	        sem_post(&mutex);
             segment* packet = packetBuffer[nextSeqNum];
             clock_gettime(CLOCK_REALTIME, &packet->sendTime);
             sendto(s, packet, sizeof(segment), 0,
@@ -106,8 +119,9 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
         }
     }
     pthread_join(recvThread, NULL);
-    clock_t end = clock();
-    double timeUsed = ((double)(end-start))/CLOCKS_PER_SEC;
+    struct timespec end;
+    clock_gettime(CLOCK_REALTIME, &end);
+    double timeUsed = end.tv_sec-start.tv_sec+(end.tv_nsec-start.tv_nsec)/1000000000.0;
     printf("%lld bytes sent, total %d packets, total time %.3f\n", actualBytes, packetNum, timeUsed);
     printf("total %lld packets resent, %lld timeout\n", packetResent, timeOutNum);
 
@@ -122,35 +136,22 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
 }
 
 void* threadRecvRetransmit(void*) {
-    struct timeval timeout;      
-    timeout.tv_sec = 0;
-    timeout.tv_usec = timeOutInterval * 1000;
-    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     while (1) {
-        /* TCP friendliness */
         ACK ack;
-        int numbytes = recvfrom(s, &ack, sizeof(ACK), 0,
+        recvfrom(s, &ack, sizeof(ACK), 0,
             (struct sockaddr *)&si_other, &slen);
-        if (numbytes == -1) { // Timeout
-            timeOutNum++;
-            segment* packet = packetBuffer[sendBase];
-            printf("Timeout! Resend packet with seqNum=%lld\n", packet->seqNum);
-            clock_gettime(CLOCK_REALTIME, &packet->sendTime);
-            sendto(s, packet, sizeof(segment), 0,
-                (struct sockaddr *)&si_other, slen);
-            packetResent++;
-            mode = SS;
-            ssthresh = cwnd * 0.5;
-            sem_wait(&mutex);
-            cwnd = 1;
-            sem_post(&mutex);
-            dupACKcount = 0;
-            continue;
-        }
         ull ackNum = ack.ackNum;
-        if (ackNum == packetNum) // Last ACK received, finish
+        if (ackNum == packetNum) { // Last ACK received, finish
+        	ualarm(0, 0);
             break;
+        }
         calculateRTT(ack.sendTime);
+        sem_wait(&mutex);
+        if (ackNum > timerNum) {
+        	ualarm(0, 0);
+        	timerReady = true;
+        }
+        sem_post(&mutex);
         printf("ack=%lld, base=%lld, seq=%lld, mode=%d, cwnd=%.3f, thresh=%.3f, dup=%d, interval=%.3f\n"
         	, ackNum, sendBase, nextSeqNum, mode, cwnd, ssthresh, dupACKcount, timeOutInterval);
         if (mode == SS) { // Slow start
@@ -220,10 +221,28 @@ void* threadRecvRetransmit(void*) {
     return NULL;
 }
 
+void timeOutHandler(int) {
+	timeOutNum++;
+    segment* packet = packetBuffer[sendBase];
+    printf("Timeout! Resend packet with seqNum=%lld\n", packet->seqNum);
+    clock_gettime(CLOCK_REALTIME, &packet->sendTime);
+    sendto(s, packet, sizeof(segment), 0,
+        (struct sockaddr *)&si_other, slen);
+    packetResent++;
+    mode = SS;
+    ssthresh = cwnd * 0.5;
+    sem_wait(&mutex);
+    cwnd = 1;
+    timerNum = packet->seqNum;
+    sem_post(&mutex);
+    dupACKcount = 0;
+    ualarm(timeOutInterval*1000, 0);
+}
+
 void calculateRTT(struct timespec sendTime) {
 	struct timespec recvTime;
 	clock_gettime(CLOCK_REALTIME, &recvTime);
-	double sampleRTT = (recvTime.tv_sec-sendTime.tv_sec)*1000 + (recvTime.tv_nsec-sendTime.tv_nsec)/1000000;
+	double sampleRTT = (recvTime.tv_sec-sendTime.tv_sec)*1000 + (recvTime.tv_nsec-sendTime.tv_nsec)/1000000.0;
 	devRTT = (1-beta)*devRTT + beta*fabs(sampleRTT-estimatedRTT);
 	estimatedRTT = (1-alpha)*estimatedRTT + alpha*sampleRTT;
 	sem_wait(&mutex);
