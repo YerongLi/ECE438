@@ -233,15 +233,15 @@ void timeOutHandler(int) {
     sendto(s, packet, sizeof(segment), 0,
         (struct sockaddr *)&si_other, slen);
     packetResent++;
+    sem_wait(&mutex);
     mode = SS;
     ssthresh = cwnd * 0.5;
-    sem_wait(&mutex);
     cwnd = 1;
-    // timerNum = packet->seqNum;
+    timerNum = packet->seqNum;
     printf("Timer restart! timerNum=%lld\n", timerNum);
     ualarm(timeOutInterval*1000, 0);
-    sem_post(&mutex);
     dupACKcount = 0;
+    sem_post(&mutex);
 }
 
 void calculateRTT(struct timespec sendTime) {
