@@ -111,7 +111,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
         		timerNum = packet->seqNum;
     			printf("Timer restart! timerNum=%lld\n", timerNum);
         		timerReady = false;
-    			ualarm(timeOutInterval*1000, 0);
+    			// ualarm(timeOutInterval*1000, 0);
         	}
 	        sem_post(&mutex);
             nextSeqNum++;
@@ -150,18 +150,18 @@ void* threadRecvRetransmit(void*) {
         	continue;
         }
         ull ackNum = ack.ackNum;
-        if (ackNum == packetNum) { // Last ACK received, finish
-        	ualarm(0, 0);
-            break;
-        }
+        // if (ackNum == packetNum) { // Last ACK received, finish
+        // 	ualarm(0, 0);
+        //     break;
+        // }
         calculateRTT(ack.sendTime);
         printf("ack=%lld, base=%lld, seq=%lld, mode=%d, cwnd=%.3f, thresh=%.3f, dup=%d, interval=%.3f\n", ackNum, sendBase, nextSeqNum, mode, cwnd, ssthresh, dupACKcount, timeOutInterval);
         sem_wait(&mutex);
-        if (!timerReady && ackNum > timerNum) {
-        	ualarm(0, 0);
-        	timerReady = true;
-        	printf("Timer stop, received timerNum=%lld\n", timerNum);
-        }
+        // if (!timerReady && ackNum > timerNum) {
+        // 	ualarm(0, 0);
+        // 	timerReady = true;
+        // 	printf("Timer stop, received timerNum=%lld\n", timerNum);
+        // }
         sem_post(&mutex);
         if (mode == SS) { // Slow start
             if (ackNum == sendBase) {
@@ -247,7 +247,7 @@ void timeOutHandler(int) {
     timerNum = packet->seqNum;
     printf("Timer restart! timerNum=%lld\n", timerNum);
     printf("%f\n", timeOutInterval*1000);
-    ualarm(timeOutInterval*1000, 0);
+    // ualarm(timeOutInterval*1000, 0);
     dupACKcount = 0;
     sem_post(&mutex);
 }
