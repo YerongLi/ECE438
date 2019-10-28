@@ -20,7 +20,7 @@ typedef unsigned short int us;
 #define payload 1450
 #define cwndRatio 0.5
 #define ssStart 1
-#define inc 5
+#define inc 1
 
 typedef struct {
     ull seqNum;
@@ -40,7 +40,7 @@ int packetNum;
 enum Congestion_Control{SS, CA, FR};
 int mode = SS;
 int dupACKcount = 0;
-int timeOutInterval = 30; // ms
+int timeOutInterval = 100; // ms
 double ssthresh = 100;
 double cwnd = ssStart;
 ull sendBase = 0;
