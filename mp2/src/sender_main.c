@@ -151,7 +151,7 @@ void* threadRecvRetransmit(void*) {
         ull ackNum = ack.ackNum;
         if (ackNum == packetNum) // Last ACK received, finish
             break;
-        // calculateRTT(ack.sendTime);
+        calculateRTT(ack.sendTime);
         printf("ack=%lld, base=%lld, seq=%lld, mode=%d, cwnd=%.3f, thresh=%.3f, dup=%d, interval=%.3f\n", ackNum, sendBase, nextSeqNum, mode, cwnd, ssthresh, dupACKcount, timeOutInterval);
         if (mode == SS) { // Slow start
             if (ackNum == sendBase) {
