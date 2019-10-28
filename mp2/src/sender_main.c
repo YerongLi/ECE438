@@ -139,6 +139,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
 void* threadRecvRetransmit(void*) {
     while (1) {
         ACK ack;
+        printf("blocked\n");
         recvfrom(s, &ack, sizeof(ACK), 0,
             (struct sockaddr *)&si_other, &slen);
         ull ackNum = ack.ackNum;
