@@ -101,18 +101,19 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
         ull wnEnd = sendBase + cwnd;
         sem_post(&mutex);
         while (nextSeqNum < packetNum && nextSeqNum < wnEnd) {
-        	sem_wait(&mutex);
-        	if (timerReady) {
-        		timerNum = nextSeqNum;
-        		timerReady = false;
-    			ualarm(timeOutInterval*1000, 0);
-        	}
-	        sem_post(&mutex);
-            segment* packet = packetBuffer[nextSeqNum];
+        	segment* packet = packetBuffer[nextSeqNum];
             clock_gettime(CLOCK_REALTIME, &packet->sendTime);
             sendto(s, packet, sizeof(segment), 0,
                 (struct sockaddr *)&si_other, slen);
             printf("Message %lld sent from main thread\n", nextSeqNum);
+            sem_wait(&mutex);
+        	if (timerReady) {
+        		timerNum = nextSeqNum;
+    			printf("Timer restart! timerNum=%lld\n", timerNum);
+        		timerReady = false;
+    			ualarm(timeOutInterval*1000, 0);
+        	}
+	        sem_post(&mutex);
             nextSeqNum++;
             if (nextSeqNum == 1)
                 pthread_create(&recvThread, NULL, threadRecvRetransmit, NULL);
@@ -223,7 +224,9 @@ void* threadRecvRetransmit(void*) {
 
 void timeOutHandler(int) {
 	timeOutNum++;
+    sem_wait(&mutex);
     segment* packet = packetBuffer[sendBase];
+    sem_post(&mutex);
     printf("Timeout! Expect ack of %lld. Resend packet with seqNum=%lld\n", timerNum, packet->seqNum);
     clock_gettime(CLOCK_REALTIME, &packet->sendTime);
     sendto(s, packet, sizeof(segment), 0,
@@ -234,6 +237,7 @@ void timeOutHandler(int) {
     sem_wait(&mutex);
     cwnd = 1;
     timerNum = packet->seqNum;
+    printf("Timer restart! timerNum=%lld\n", timerNum);
     ualarm(timeOutInterval*1000, 0);
     sem_post(&mutex);
     dupACKcount = 0;
