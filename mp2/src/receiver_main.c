@@ -56,7 +56,7 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
 		recvfrom(s, &packet, sizeof(segment), 0,
 			(struct sockaddr *)&si_other, &slen);
 		ull seqNum = packet.seqNum;
-		printf("seqNum = %lld, nextByteExpected = %lld\n", seqNum, nextByteExpected);
+		// printf("seqNum = %lld, nextByteExpected = %lld\n", seqNum, nextByteExpected);
 		if (!buffer.count(seqNum)) { // new ACK
 			segment* cur = (segment*)malloc(sizeof(segment));
 			cur->seqNum = seqNum;
