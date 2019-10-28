@@ -93,7 +93,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
     pthread_t recvThread;
     sem_init(&mutex, 0, 1);
 	/* Retransmit through signal */
-    // signal(SIGALRM, timeOutHandler);
+    signal(SIGALRM, timeOutHandler);
     while (1) {
         if (nextSeqNum == packetNum)
             break;
@@ -111,7 +111,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
         		timerNum = packet->seqNum;
     			printf("Timer restart! timerNum=%lld\n", timerNum);
         		timerReady = false;
-    			// ualarm(timeOutInterval*1000, 0);
+    			ualarm(timeOutInterval*1000, 0);
         	}
 	        sem_post(&mutex);
             nextSeqNum++;
@@ -137,31 +137,25 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
 }
 
 void* threadRecvRetransmit(void*) {
-    struct timeval timeout;
-    timeout.tv_sec = 0;
-    timeout.tv_usec = timeOutInterval * 1000;
-    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     while (1) {
         ACK ack;
         printf("blocked\n");
-        int numbytes = recvfrom(s, &ack, sizeof(ACK), 0, (struct sockaddr *)&si_other, &slen);
-        if (numbytes == -1) {
-        	timeOutHandler(1);
-        	continue;
-        }
+        recvfrom(s, &ack, sizeof(ACK), 0,
+            (struct sockaddr *)&si_other, &slen);
         ull ackNum = ack.ackNum;
-        // if (ackNum == packetNum) { // Last ACK received, finish
-        // 	ualarm(0, 0);
-        //     break;
-        // }
+        if (ackNum == packetNum) { // Last ACK received, finish
+        	ualarm(0, 0);
+            break;
+        }
         calculateRTT(ack.sendTime);
-        printf("ack=%lld, base=%lld, seq=%lld, mode=%d, cwnd=%.3f, thresh=%.3f, dup=%d, interval=%.3f\n", ackNum, sendBase, nextSeqNum, mode, cwnd, ssthresh, dupACKcount, timeOutInterval);
+        printf("ack=%lld, base=%lld, seq=%lld, mode=%d, cwnd=%.3f, thresh=%.3f, dup=%d, interval=%.3f\n"
+        	, ackNum, sendBase, nextSeqNum, mode, cwnd, ssthresh, dupACKcount, timeOutInterval);
         sem_wait(&mutex);
-        // if (!timerReady && ackNum > timerNum) {
-        // 	ualarm(0, 0);
-        // 	timerReady = true;
-        // 	printf("Timer stop, received timerNum=%lld\n", timerNum);
-        // }
+        if (!timerReady && ackNum > timerNum) {
+        	ualarm(0, 0);
+        	timerReady = true;
+        	printf("Timer stop, received timerNum=%lld\n", timerNum);
+        }
         sem_post(&mutex);
         if (mode == SS) { // Slow start
             if (ackNum == sendBase) {
@@ -235,7 +229,7 @@ void timeOutHandler(int) {
     sem_wait(&mutex);
     segment* packet = packetBuffer[sendBase];
     sem_post(&mutex);
-    printf("-------------------Timeout! Expect ack of %lld. Resend packet with seqNum=%lld\n", timerNum, packet->seqNum);
+    printf("Timeout! Expect ack of %lld. Resend packet with seqNum=%lld\n", timerNum, packet->seqNum);
     clock_gettime(CLOCK_REALTIME, &packet->sendTime);
     sendto(s, packet, sizeof(segment), 0,
         (struct sockaddr *)&si_other, slen);
@@ -246,8 +240,7 @@ void timeOutHandler(int) {
     cwnd = 1;
     timerNum = packet->seqNum;
     printf("Timer restart! timerNum=%lld\n", timerNum);
-    printf("%f\n", timeOutInterval*1000);
-    // ualarm(timeOutInterval*1000, 0);
+    ualarm(timeOutInterval*1000, 0);
     dupACKcount = 0;
     sem_post(&mutex);
 }
@@ -261,10 +254,6 @@ void calculateRTT(struct timespec sendTime) {
 	sem_wait(&mutex);
 	timeOutInterval = estimatedRTT + 4*devRTT;
     sem_post(&mutex);
-    struct timeval timeout;
-    timeout.tv_sec = 0;
-    timeout.tv_usec = timeOutInterval * 1000;
-    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 }
 
 void storeFile(char* filename, ull actualBytes) {
