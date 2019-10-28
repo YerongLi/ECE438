@@ -108,7 +108,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
             printf("Message %lld sent from main thread\n", nextSeqNum);
             sem_wait(&mutex);
         	if (timerReady) {
-        		timerNum = nextSeqNum;
+        		timerNum = packet->seqNum;
     			printf("Timer restart! timerNum=%lld\n", timerNum);
         		timerReady = false;
     			ualarm(timeOutInterval*1000, 0);
@@ -147,6 +147,8 @@ void* threadRecvRetransmit(void*) {
             break;
         }
         calculateRTT(ack.sendTime);
+        printf("ack=%lld, base=%lld, seq=%lld, mode=%d, cwnd=%.3f, thresh=%.3f, dup=%d, interval=%.3f\n"
+        	, ackNum, sendBase, nextSeqNum, mode, cwnd, ssthresh, dupACKcount, timeOutInterval);
         sem_wait(&mutex);
         if (!timerReady && ackNum > timerNum) {
         	ualarm(0, 0);
@@ -154,8 +156,6 @@ void* threadRecvRetransmit(void*) {
         	printf("Timer stop, received timerNum=%lld\n", timerNum);
         }
         sem_post(&mutex);
-        printf("ack=%lld, base=%lld, seq=%lld, mode=%d, cwnd=%.3f, thresh=%.3f, dup=%d, interval=%.3f\n"
-        	, ackNum, sendBase, nextSeqNum, mode, cwnd, ssthresh, dupACKcount, timeOutInterval);
         if (mode == SS) { // Slow start
             if (ackNum == sendBase) {
                 dupACKcount++;

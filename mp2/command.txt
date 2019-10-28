@@ -16,9 +16,9 @@ make clean && git pull && make
 ./reliable_sender 192.168.0.10 1600 seg.txt 100000000
 
 ------------------------------------------------------------------------------------------------------
-rm out && git add -u && git commit -m "try" && git push
+rm out && git add -u && git commit -m "try" && git push && make
 
-make && ./reliable_receiver 1600 out
+./reliable_receiver 1600 out
 
 ------------------------------------------------------------------------------------------------------
 http://cs438fa19.csl.illinois.edu:8080/queue/queue.html
