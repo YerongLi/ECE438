@@ -228,11 +228,11 @@ void calculateRTT(struct timespec sendTime) {
     estimatedRTT = (1-alpha)*estimatedRTT + alpha*sampleRTT;
     sem_wait(&mutex);
     timeOutInterval = estimatedRTT + 4*devRTT;
-    sem_post(&mutex);
     struct timeval timeout;      
     timeout.tv_sec = 0;
     timeout.tv_usec = timeOutInterval * 1000;
     setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    sem_post(&mutex);
 }
 
 void storeFile(char* filename, ull actualBytes) {
