@@ -96,8 +96,8 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
 	struct sigaction sa;
 	sa.sa_flags = SA_RESTART;
 	sa.sa_handler = timeOutHandler;
-    sigemptyset(&s.sa_mask);
-    s.sa_flags = 0;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
     sigaction(SIGALRM, &sa, NULL);
     // signal(SIGALRM, timeOutHandler);
     while (1) {
