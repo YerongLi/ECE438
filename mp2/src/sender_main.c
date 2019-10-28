@@ -224,7 +224,7 @@ void* threadRecvRetransmit(void*) {
 void timeOutHandler(int) {
 	timeOutNum++;
     segment* packet = packetBuffer[sendBase];
-    printf("Timeout! Resend packet with seqNum=%lld\n", packet->seqNum);
+    printf("Timeout! Expect ack of %lld. Resend packet with seqNum=%lld\n", timerNum, packet->seqNum);
     clock_gettime(CLOCK_REALTIME, &packet->sendTime);
     sendto(s, packet, sizeof(segment), 0,
         (struct sockaddr *)&si_other, slen);
