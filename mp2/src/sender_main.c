@@ -244,6 +244,7 @@ void timeOutHandler(int) {
     ualarm(timeOutInterval*1000, 0);
     dupACKcount = 0;
     sem_post(&mutex);
+    signal(SIGALRM, timeOutHandler);
 }
 
 void calculateRTT(struct timespec sendTime) {
