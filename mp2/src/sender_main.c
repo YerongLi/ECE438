@@ -93,7 +93,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
     pthread_t recvThread;
     sem_init(&mutex, 0, 1);
 	/* Retransmit through signal */
-    signal(SIGALRM, timeOutHandler);
+    // signal(SIGALRM, timeOutHandler);
     while (1) {
         if (nextSeqNum == packetNum)
             break;
@@ -144,7 +144,11 @@ void* threadRecvRetransmit(void*) {
     while (1) {
         ACK ack;
         printf("blocked\n");
-        recvfrom(s, &ack, sizeof(ACK), 0, (struct sockaddr *)&si_other, &slen);
+        int numbytes = recvfrom(s, &ack, sizeof(ACK), 0, (struct sockaddr *)&si_other, &slen);
+        if (numbytes == -1) {
+        	timeOutHandler(1);
+        	continue;
+        }
         ull ackNum = ack.ackNum;
         if (ackNum == packetNum) { // Last ACK received, finish
         	ualarm(0, 0);
