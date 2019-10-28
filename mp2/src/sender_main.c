@@ -140,8 +140,8 @@ void* threadRecvRetransmit(void*) {
     while (1) {
         ACK ack;
         printf("blocked\n");
-        // recvfrom(s, &ack, sizeof(ACK), 0,
-        //     (struct sockaddr *)&si_other, &slen);
+        recvfrom(s, &ack, sizeof(ACK), 0,
+            (struct sockaddr *)&si_other, &slen);
         ull ackNum = ack.ackNum;
         if (ackNum == packetNum) { // Last ACK received, finish
         	ualarm(0, 0);
