@@ -232,7 +232,7 @@ void timeOutHandler(int) {
     sem_wait(&mutex);
     segment* packet = packetBuffer[sendBase];
     sem_post(&mutex);
-    printf("Timeout! Expect ack of %lld. Resend packet with seqNum=%lld\n", timerNum, packet->seqNum);
+    printf("-------------------Timeout! Expect ack of %lld. Resend packet with seqNum=%lld\n", timerNum, packet->seqNum);
     clock_gettime(CLOCK_REALTIME, &packet->sendTime);
     sendto(s, packet, sizeof(segment), 0,
         (struct sockaddr *)&si_other, slen);
