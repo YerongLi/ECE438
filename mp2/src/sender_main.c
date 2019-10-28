@@ -39,7 +39,7 @@ int packetNum;
 enum Congestion_Control{SS, CA, FR};
 int mode = SS;
 int dupACKcount = 0;
-int timeOutInterval = 50; // ms
+int timeOutInterval = 30; // ms
 double ssthresh = 100;
 double cwnd = inc;
 ull sendBase = 0;
