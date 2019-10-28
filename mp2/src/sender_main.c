@@ -82,7 +82,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
         sem_wait(&mutex);
         ull wnEnd = sendBase + cwnd;
         sem_post(&mutex);
-        while (nextSeqNum < packetNum && nextSeqNum < wnEnd) {
+        if (nextSeqNum < packetNum && nextSeqNum < wnEnd) {
             segment* packet = packetBuffer[nextSeqNum];
             sendto(s, packet, sizeof(segment), 0,
                 (struct sockaddr *)&si_other, slen);
