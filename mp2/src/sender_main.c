@@ -140,8 +140,10 @@ void* threadRecvRetransmit(void*) {
     while (1) {
         ACK ack;
         printf("blocked\n");
+    	sem_wait(&mutex);
         recvfrom(s, &ack, sizeof(ACK), 0,
             (struct sockaddr *)&si_other, &slen);
+        sem_post(&mutex);
         ull ackNum = ack.ackNum;
         if (ackNum == packetNum) { // Last ACK received, finish
         	ualarm(0, 0);
@@ -226,15 +228,13 @@ void* threadRecvRetransmit(void*) {
 
 void timeOutHandler(int) {
 	timeOutNum++;
+    packetResent++;
     sem_wait(&mutex);
     segment* packet = packetBuffer[sendBase];
-    sem_post(&mutex);
     printf("Timeout! Expect ack of %lld. Resend packet with seqNum=%lld\n", timerNum, packet->seqNum);
     clock_gettime(CLOCK_REALTIME, &packet->sendTime);
     sendto(s, packet, sizeof(segment), 0,
         (struct sockaddr *)&si_other, slen);
-    packetResent++;
-    sem_wait(&mutex);
     mode = SS;
     ssthresh = cwnd * 0.5;
     cwnd = 1;
