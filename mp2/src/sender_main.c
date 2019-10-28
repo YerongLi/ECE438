@@ -111,7 +111,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
         		timerNum = packet->seqNum;
     			printf("Timer restart! timerNum=%lld\n", timerNum);
         		timerReady = false;
-    			ualarm(timeOutInterval*1000, 0);
+    			ualarm(timeOutInterval, 0);
         	}
 	        sem_post(&mutex);
             nextSeqNum++;
