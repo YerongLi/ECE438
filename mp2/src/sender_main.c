@@ -19,6 +19,8 @@
 typedef unsigned long long int ull;
 typedef unsigned short int us;
 #define payload 1400
+#define beta 0.25
+#define alpha 0.125
 
 typedef struct {
     ull seqNum;
@@ -44,7 +46,6 @@ int packetNum;
 enum Congestion_Control{SS, CA, FR};
 int mode = SS;
 int dupACKcount = 0;
-int timeOutInterval = 30; // ms
 double ssthresh = 100;
 double cwnd = 1;
 ull sendBase = 0;
@@ -52,12 +53,18 @@ ull nextSeqNum = 0;
 ull packetResent = 0;
 ull timeOutNum = 0;
 /* sendBase and cwnd are shared by 2 threads, but in thread 1 they are only read.
-And they are only changed in thread 2, so in thread 2 only write need mutex */
+And they are only changed in thread 2, so in thread 2 only write need mutex.
+timeOutInterval is shared by thread 2 and signal handler */
 sem_t mutex;
+/* Timeout parameters, ms */
+double timeOutInterval = 30;
+double estimatedRTT = 30;
+double devRTT = 0;
 
 void diep(const char* s);
 ull readSize(char* filename, ull bytesToTransfer);
 void storeFile(char* filename, ull actualBytes);
+void calculateRTT(struct timespec startTime);
 void* threadRecvRetransmit(void*);
 
 void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesToTransfer) {
@@ -89,6 +96,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
         sem_post(&mutex);
         if (nextSeqNum < packetNum && nextSeqNum < wnEnd) {
             segment* packet = packetBuffer[nextSeqNum];
+            clock_gettime(CLOCK_REALTIME, &packet->startTime);
             sendto(s, packet, sizeof(segment), 0,
                 (struct sockaddr *)&si_other, slen);
             printf("Message %lld sent from main thread\n", nextSeqNum);
@@ -124,9 +132,10 @@ void* threadRecvRetransmit(void*) {
         int numbytes = recvfrom(s, &ack, sizeof(ACK), 0,
             (struct sockaddr *)&si_other, &slen);
         if (numbytes == -1) { // Timeout
+            timeOutNum++;
             segment* packet = packetBuffer[sendBase];
             printf("Timeout! Resend packet with seqNum=%lld\n", packet->seqNum);
-            timeOutNum++;
+            clock_gettime(CLOCK_REALTIME, &packet->startTime);
             sendto(s, packet, sizeof(segment), 0,
                 (struct sockaddr *)&si_other, slen);
             packetResent++;
@@ -140,7 +149,7 @@ void* threadRecvRetransmit(void*) {
         }
         ull ackNum = ack.ackNum;
         printf("ack=%lld, base=%lld, seq=%lld, mode=%d, cwnd=%.3f, thresh=%.3f, dup=%d\n", ackNum, sendBase, nextSeqNum, mode, cwnd, ssthresh, dupACKcount);
-        if (ackNum == packetNum)
+        if (ackNum == packetNum) // Last ACK received, finish
             break;
         if (mode == SS) { // Slow start
             if (ackNum == sendBase) {
@@ -152,6 +161,7 @@ void* threadRecvRetransmit(void*) {
                     cwnd = ssthresh + 3;
                     sem_post(&mutex);
                     segment* packet = packetBuffer[sendBase];
+            		clock_gettime(CLOCK_REALTIME, &packet->startTime);
                     sendto(s, packet, sizeof(segment), 0,
                         (struct sockaddr *)&si_other, slen);
                     printf("3 dup! Resend packet with seqNum=%lld\n", packet->seqNum);
@@ -176,6 +186,7 @@ void* threadRecvRetransmit(void*) {
                     cwnd = ssthresh + 3;
                     sem_post(&mutex);
                     segment* packet = packetBuffer[sendBase];
+            		clock_gettime(CLOCK_REALTIME, &packet->startTime);
                     sendto(s, packet, sizeof(segment), 0,
                         (struct sockaddr *)&si_other, slen);
                     printf("3 dup! Resend packet with seqNum=%lld\n", packet->seqNum);
@@ -194,12 +205,6 @@ void* threadRecvRetransmit(void*) {
                 sem_wait(&mutex);
                 cwnd += 1;
                 sem_post(&mutex);
-                if (dupACKcount % 3 == 0) {
-                    segment* packet = packetBuffer[sendBase];
-                    sendto(s, packet, sizeof(segment), 0,
-                        (struct sockaddr *)&si_other, slen);
-                    packetResent++;
-                }
             } else if (ackNum > sendBase) {
                 mode = CA;
                 sem_wait(&mutex);
@@ -211,6 +216,17 @@ void* threadRecvRetransmit(void*) {
         }
     }
     return NULL;
+}
+
+void calculateRTT(struct timespec startTime) {
+	struct timespec endTime;
+	clock_gettime(CLOCK_REALTIME, &endTime);
+	double sampleRTT = (endTime.tv_sec-startTime.tv_sec)*1000 + (endTime.tv_nsec-startTime.tv_nsec)/1000000;
+	devRTT = (1-beta)*devRTT + beta*fabs(sampleRTT-estimatedRTT);
+	estimatedRTT = (1-alpha)*estimatedRTT + alpha*sampleRTT;
+	sem_wait(&mutex);
+	timeOutInterval = estimatedRTT + 4*devRTT;
+    sem_post(&mutex);
 }
 
 void storeFile(char* filename, ull actualBytes) {
