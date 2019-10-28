@@ -18,7 +18,8 @@
 typedef unsigned long long int ull;
 typedef unsigned short int us;
 #define payload 1450
-#define cwndRatio 0.8
+#define cwndRatio 0.5
+#define ssStart 1
 #define inc 1
 
 typedef struct {
@@ -41,7 +42,7 @@ int mode = SS;
 int dupACKcount = 0;
 int timeOutInterval = 30; // ms
 double ssthresh = 100;
-double cwnd = inc;
+double cwnd = ssStart;
 ull sendBase = 0;
 ull nextSeqNum = 0;
 ull packetResent = 0;
@@ -128,7 +129,7 @@ void* threadRecvRetransmit(void*) {
             mode = SS;
             ssthresh = cwnd * cwndRatio;
             sem_wait(&mutex);
-            cwnd = inc;
+            cwnd = ssStart;
             sem_post(&mutex);
             dupACKcount = 0;
             continue;
@@ -186,12 +187,12 @@ void* threadRecvRetransmit(void*) {
                 sem_wait(&mutex);
                 cwnd += inc / cwnd;
                 sem_post(&mutex);
-                if (dupACKcount % 3 == 0) {
-                    segment* packet = packetBuffer[sendBase];
-                    sendto(s, packet, sizeof(segment), 0,
-                        (struct sockaddr *)&si_other, slen);
-                    packetResent++;
-                }
+                // if (dupACKcount % 3 == 0) {
+                //     segment* packet = packetBuffer[sendBase];
+                //     sendto(s, packet, sizeof(segment), 0,
+                //         (struct sockaddr *)&si_other, slen);
+                //     packetResent++;
+                // }
             } else if (ack > sendBase) {
                 mode = CA;
                 sem_wait(&mutex);
