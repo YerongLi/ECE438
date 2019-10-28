@@ -93,7 +93,11 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
     pthread_t recvThread;
     sem_init(&mutex, 0, 1);
 	/* Retransmit through signal */
-    signal(SIGALRM, timeOutHandler);
+	struct sigaction sa;
+	sa.sa_flags = SA_RESTART;
+	sa.sa_handler = &timeOutHandler;
+    // signal(SIGALRM, timeOutHandler);
+    sigaction(SIGALRM, &sa, NULL);
     while (1) {
         if (nextSeqNum == packetNum)
             break;
@@ -244,7 +248,6 @@ void timeOutHandler(int) {
     ualarm(timeOutInterval*1000, 0);
     dupACKcount = 0;
     sem_post(&mutex);
-    // signal(SIGALRM, timeOutHandler);
 }
 
 void calculateRTT(struct timespec sendTime) {
