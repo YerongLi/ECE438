@@ -106,7 +106,7 @@ void writeFile(ull nextByteExpected) {
 	ull length = packet->length;
 	total += length;
 	fwrite(packet->data, 1, length, fp);
-	free(packet);
+	// free(packet);
 }
 
 void diep(const char *s) {
