@@ -103,7 +103,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
             (struct sockaddr *)&si_other, &slen);
         if (numBytes == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) { // Receive nothing
             if (timerReady && !reSend) {
-                timerNum = sendBase;
+                timerNum = nextSeqNum;
                 printf("Timer restart! timerNum=%lld\n", timerNum);
                 timerReady = false;
                 ualarm(timeOutInterval*1000, 0);
