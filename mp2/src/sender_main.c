@@ -102,6 +102,12 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
         int numBytes = recvfrom(s, &ack, sizeof(ACK), 0,
             (struct sockaddr *)&si_other, &slen);
         if (numBytes == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) { // Receive nothing
+            if (timerReady && !reSend) {
+                timerNum = sendBase;
+                printf("Timer restart! timerNum=%lld\n", timerNum);
+                timerReady = false;
+                ualarm(timeOutInterval*1000, 0);
+            }
             if (timerReady && reSend) {
                 segment* packet = packetBuffer[sendBase];
                 printf("Timeout! Expect ack of %lld. Resend packet with seqNum=%lld\n", timerNum, packet->seqNum);
@@ -119,16 +125,9 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
                 ualarm(timeOutInterval*1000, 0);
                 timerReady = false;
                 reSend = false;
-                continue;
             }
             ull wnEnd = sendBase + cwnd;
             while (nextSeqNum < packetNum && nextSeqNum < wnEnd) {
-                if (timerReady && !reSend) {
-                    timerNum = nextSeqNum;
-                    printf("Timer restart! timerNum=%lld\n", timerNum);
-                    timerReady = false;
-                    ualarm(timeOutInterval*1000, 0);
-                }
                 segment* packet = packetBuffer[nextSeqNum];
                 clock_gettime(CLOCK_REALTIME, &packet->sendTime);
                 sendto(s, packet, sizeof(segment), 0,
@@ -147,7 +146,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
         calculateRTT(ack.sendTime);
         printf("ack=%lld, base=%lld, seq=%lld, mode=%d, cwnd=%.3f, thresh=%.3f, dup=%d, interval=%.3f\n"
             , ackNum, sendBase, nextSeqNum, mode, cwnd, ssthresh, dupACKcount, timeOutInterval);
-        if (ackNum > timerNum) {
+        if (!timerReady && ackNum > timerNum) {
             ualarm(0, 0);
             timerReady = true;
             printf("Timer stop, received timerNum=%lld\n", timerNum);
