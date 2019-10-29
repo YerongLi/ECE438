@@ -105,10 +105,10 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
             if (timerReady) {
                 if (!reSend) {
                     timerNum = nextSeqNum;
-                    // printf("Timer restart! timerNum=%lld\n", timerNum);
+                    printf("Timer restart! timerNum=%lld\n", timerNum);
                 } else {
                     segment* packet = packetBuffer[sendBase];
-                    // printf("Timeout! Expect ack of %lld. Resend packet with seqNum=%lld\n", timerNum, packet->seqNum);
+                    printf("Timeout! Expect ack of %lld. Resend packet with seqNum=%lld\n", timerNum, packet->seqNum);
                     clock_gettime(CLOCK_REALTIME, &packet->sendTime);
                     sendto(s, packet, sizeof(segment), 0,
                         (struct sockaddr *)&si_other, slen);
@@ -118,7 +118,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
                     cwnd = 1;
                     dupACKcount = 0;
                     timerNum = packet->seqNum;
-                    // printf("Timer restart! timerNum=%lld\n", timerNum);
+                    printf("Timer restart! timerNum=%lld\n", timerNum);
                     reSend = false;
                 }
                 timerReady = false;
@@ -130,7 +130,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
                 clock_gettime(CLOCK_REALTIME, &packet->sendTime);
                 sendto(s, packet, sizeof(segment), 0,
                     (struct sockaddr *)&si_other, slen);
-                // printf("Message %lld sent from main thread\n", nextSeqNum);
+                printf("Message %lld sent from main thread\n", nextSeqNum);
                 nextSeqNum++;
             }
             continue;
@@ -146,7 +146,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
         if (!timerReady && ackNum > timerNum) {
             ualarm(0, 0);
             timerReady = true;
-            // printf("Timer stop, received timerNum=%lld\n", timerNum);
+            printf("Timer stop, received timerNum=%lld\n", timerNum);
         }
         if (mode == SS) { // Slow start
             if (ackNum == sendBase) {
@@ -159,7 +159,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
                     clock_gettime(CLOCK_REALTIME, &packet->sendTime);
                     sendto(s, packet, sizeof(segment), 0,
                         (struct sockaddr *)&si_other, slen);
-                    // printf("3 dup! Resend packet with seqNum=%lld\n", packet->seqNum);
+                    printf("3 dup! Resend packet with seqNum=%lld\n", packet->seqNum);
                     packetResent++;
                 }
             } else if (ackNum > sendBase) {
@@ -180,7 +180,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
                     clock_gettime(CLOCK_REALTIME, &packet->sendTime);
                     sendto(s, packet, sizeof(segment), 0,
                         (struct sockaddr *)&si_other, slen);
-                    // printf("3 dup! Resend packet with seqNum=%lld\n", packet->seqNum);
+                    printf("3 dup! Resend packet with seqNum=%lld\n", packet->seqNum);
                     packetResent++;
                 }
             } else if (ackNum > sendBase) {
