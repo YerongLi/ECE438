@@ -102,29 +102,28 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
         int numBytes = recvfrom(s, &ack, sizeof(ACK), 0,
             (struct sockaddr *)&si_other, &slen);
         if (numBytes == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) { // Receive nothing
-            if (timerReady && !reSend) {
-                timerNum = nextSeqNum;
-                printf("Timer restart! timerNum=%lld\n", timerNum);
+            if (timerReady) {
+                if (!reSend) {
+                    timerNum = nextSeqNum;
+                    printf("Timer restart! timerNum=%lld\n", timerNum);
+                } else {
+                    segment* packet = packetBuffer[sendBase];
+                    printf("Timeout! Expect ack of %lld. Resend packet with seqNum=%lld\n", timerNum, packet->seqNum);
+                    clock_gettime(CLOCK_REALTIME, &packet->sendTime);
+                    sendto(s, packet, sizeof(segment), 0,
+                        (struct sockaddr *)&si_other, slen);
+                    packetResent++;
+                    mode = SS;
+                    ssthresh = cwnd * 0.5;
+                    cwnd = 1;
+                    dupACKcount = 0;
+                    timerNum = packet->seqNum;
+                    printf("Timer restart! timerNum=%lld\n", timerNum);
+                    printf("%.3f\n", timeOutInterval);
+                    reSend = false;
+                }
                 timerReady = false;
                 ualarm(timeOutInterval*1000, 0);
-            }
-            if (timerReady && reSend) {
-                segment* packet = packetBuffer[sendBase];
-                printf("Timeout! Expect ack of %lld. Resend packet with seqNum=%lld\n", timerNum, packet->seqNum);
-                clock_gettime(CLOCK_REALTIME, &packet->sendTime);
-                sendto(s, packet, sizeof(segment), 0,
-                    (struct sockaddr *)&si_other, slen);
-                packetResent++;
-                mode = SS;
-                ssthresh = cwnd * 0.5;
-                cwnd = 1;
-                dupACKcount = 0;
-                timerNum = packet->seqNum;
-                printf("Timer restart! timerNum=%lld\n", timerNum);
-                printf("%.3f\n", timeOutInterval);
-                ualarm(timeOutInterval*1000, 0);
-                timerReady = false;
-                reSend = false;
             }
             ull wnEnd = sendBase + cwnd;
             while (nextSeqNum < packetNum && nextSeqNum < wnEnd) {
