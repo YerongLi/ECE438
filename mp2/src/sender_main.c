@@ -121,15 +121,13 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
                 reSend = false;
             }
             ull wnEnd = sendBase + cwnd;
-            if (nextSeqNum < packetNum && nextSeqNum < wnEnd) {
+            while (nextSeqNum < packetNum && nextSeqNum < wnEnd) {
                 if (timerReady && !reSend) {
                     timerNum = nextSeqNum;
                     printf("Timer restart! timerNum=%lld\n", timerNum);
                     timerReady = false;
                     ualarm(timeOutInterval*1000, 0);
                 }
-            }
-            while (nextSeqNum < packetNum && nextSeqNum < wnEnd) {
                 segment* packet = packetBuffer[nextSeqNum];
                 clock_gettime(CLOCK_REALTIME, &packet->sendTime);
                 sendto(s, packet, sizeof(segment), 0,
@@ -148,15 +146,11 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
         calculateRTT(ack.sendTime);
         printf("ack=%lld, base=%lld, seq=%lld, mode=%d, cwnd=%.3f, thresh=%.3f, dup=%d, interval=%.3f\n"
             , ackNum, sendBase, nextSeqNum, mode, cwnd, ssthresh, dupACKcount, timeOutInterval);
-        // printf("lock1\n");
-        // sem_wait(&mutex);
         if (!timerReady && ackNum > timerNum) {
             ualarm(0, 0);
             timerReady = true;
             printf("Timer stop, received timerNum=%lld\n", timerNum);
         }
-        // sem_post(&mutex);
-        // printf("release1\n");
         if (mode == SS) { // Slow start
             if (ackNum == sendBase) {
                 dupACKcount++;
@@ -219,30 +213,15 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
     for (int i = 0; i < packetNum; i++)
         free(packetBuffer[i]);
     free(packetBuffer);
-    sem_destroy(&mutex);
-    // sem_destroy(&mutex);
     printf("Closing the socket\n");
     close(s);
     return;
 }
 
-void* threadRecvRetransmit(void*) {
-    // struct timeval timeout;
-    // timeout.tv_sec = 0;
-    // timeout.tv_usec = 0;
-    // setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
-    
-    return NULL;
-}
-
 void timeOutHandler(int) {
     timeOutNum++;
-    // printf("lock11\n");
-    // sem_wait(&mutex);
     timerReady = true;
     reSend = true;
-    // sem_post(&mutex);
-    // printf("release11\n");
 }
 
 void calculateRTT(struct timespec sendTime) {
