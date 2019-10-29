@@ -56,9 +56,8 @@ ull packetResent = 0;
 ull timeOutNum = 0;
 /* sendBase and cwnd are shared by 2 threads, but in thread 1 they are only read.
 And they are only changed in thread 2, so in thread 2 only write need mutex */
-sem_t mutex;
 /* timeOutInterval, timerNum, timerReady is shared by thread 1, 2 and signal handler */
-// sem_t mutex;
+sem_t mutex;
 /* Timeout parameters, ms */
 double timeOutInterval = 30;
 double estimatedRTT = 30;
@@ -94,8 +93,6 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
     /* Send data and receive acknowledgements on s */
     struct timespec start;
     clock_gettime(CLOCK_REALTIME, &start);
-    pthread_t recvThread;
-    // sem_init(&mutex, 0, 1);
     sem_init(&mutex, 0, 1);
     /* Retransmit through signal */
     signal(SIGALRM, timeOutHandler);
@@ -212,7 +209,6 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
             }
         }
     }
-    // pthread_join(recvThread, NULL);
     struct timespec end;
     clock_gettime(CLOCK_REALTIME, &end);
     double timeUsed = end.tv_sec-start.tv_sec+(end.tv_nsec-start.tv_nsec)/1000000000.0;
