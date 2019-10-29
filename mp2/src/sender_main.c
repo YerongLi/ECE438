@@ -101,7 +101,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
             clock_gettime(CLOCK_REALTIME, &packet->sendTime);
             sendto(s, packet, sizeof(segment), 0,
                 (struct sockaddr *)&si_other, slen);
-            printf("Message %lld sent from main thread\n", nextSeqNum);
+            // printf("Message %lld sent from main thread\n", nextSeqNum);
             nextSeqNum++;
             if (nextSeqNum == 1)
                 pthread_create(&recvThread, NULL, threadRecvRetransmit, NULL);
@@ -119,7 +119,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
     free(packetBuffer);
     sem_destroy(&mutex);
     printf("Closing the socket\n");
-    // close(s);
+    close(s);
     return;
 }
 
@@ -135,7 +135,7 @@ void* threadRecvRetransmit(void*) {
         if (numbytes == -1) { // Timeout
             timeOutNum++;
             segment* packet = packetBuffer[sendBase];
-            printf("Timeout! Resend packet with seqNum=%lld\n", packet->seqNum);
+            // printf("Timeout! Resend packet with seqNum=%lld\n", packet->seqNum);
             clock_gettime(CLOCK_REALTIME, &packet->sendTime);
             sendto(s, packet, sizeof(segment), 0,
                 (struct sockaddr *)&si_other, slen);
@@ -152,7 +152,7 @@ void* threadRecvRetransmit(void*) {
         if (ackNum == packetNum) // Last ACK received, finish
             break;
         calculateRTT(ack.sendTime);
-        printf("ack=%lld, base=%lld, seq=%lld, mode=%d, cwnd=%.3f, thresh=%.3f, dup=%d, interval=%.3f\n", ackNum, sendBase, nextSeqNum, mode, cwnd, ssthresh, dupACKcount, timeOutInterval);
+        // printf("ack=%lld, base=%lld, seq=%lld, mode=%d, cwnd=%.3f, thresh=%.3f, dup=%d, interval=%.3f\n", ackNum, sendBase, nextSeqNum, mode, cwnd, ssthresh, dupACKcount, timeOutInterval);
         if (mode == SS) { // Slow start
             if (ackNum == sendBase) {
                 dupACKcount++;
@@ -166,7 +166,7 @@ void* threadRecvRetransmit(void*) {
                     clock_gettime(CLOCK_REALTIME, &packet->sendTime);
                     sendto(s, packet, sizeof(segment), 0,
                         (struct sockaddr *)&si_other, slen);
-                    printf("3 dup! Resend packet with seqNum=%lld\n", packet->seqNum);
+                    // printf("3 dup! Resend packet with seqNum=%lld\n", packet->seqNum);
                     packetResent++;
                 }
             } else if (ackNum > sendBase) {
@@ -191,7 +191,7 @@ void* threadRecvRetransmit(void*) {
                     clock_gettime(CLOCK_REALTIME, &packet->sendTime);
                     sendto(s, packet, sizeof(segment), 0,
                         (struct sockaddr *)&si_other, slen);
-                    printf("3 dup! Resend packet with seqNum=%lld\n", packet->seqNum);
+                    // printf("3 dup! Resend packet with seqNum=%lld\n", packet->seqNum);
                     packetResent++;
                 }
             } else if (ackNum > sendBase) {
