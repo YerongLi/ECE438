@@ -147,7 +147,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
         calculateRTT(ack.sendTime);
         printf("ack=%lld, base=%lld, seq=%lld, mode=%d, cwnd=%.3f, thresh=%.3f, dup=%d, interval=%.3f\n"
             , ackNum, sendBase, nextSeqNum, mode, cwnd, ssthresh, dupACKcount, timeOutInterval);
-        if (!timerReady && ackNum > timerNum) {
+        if (ackNum > timerNum) {
             ualarm(0, 0);
             timerReady = true;
             printf("Timer stop, received timerNum=%lld\n", timerNum);
