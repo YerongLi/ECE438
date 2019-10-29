@@ -119,6 +119,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
                 ualarm(timeOutInterval*1000, 0);
                 timerReady = false;
                 reSend = false;
+                continue;
             }
             ull wnEnd = sendBase + cwnd;
             while (nextSeqNum < packetNum && nextSeqNum < wnEnd) {
