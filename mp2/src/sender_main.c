@@ -119,7 +119,6 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
                     dupACKcount = 0;
                     timerNum = packet->seqNum;
                     printf("Timer restart! timerNum=%lld\n", timerNum);
-                    printf("%.3f\n", timeOutInterval);
                     reSend = false;
                 }
                 timerReady = false;
