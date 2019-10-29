@@ -77,7 +77,6 @@ void reliablyReceive(us myUDPport, char* destinationFile) {
 		ACK ack;
 		ack.ackNum = nextByteExpected;
 		ack.sendTime = packet.sendTime;
-		printf("send ACK=%lld\n", nextByteExpected);
 		sendto(s, &ack, sizeof(ACK), 0,
 			(struct sockaddr *)&si_other, slen);
 		if (packet.end == '1')
