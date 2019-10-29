@@ -9,7 +9,7 @@ sudo tc qdisc show dev enp0s3
 wlp2s0
 
 ------------------------------------------------------------------------------------------------------
-rm output && make clean && git pull && make
+make clean && git pull && make
 
 ./reliable_sender 192.168.0.10 1600 test_small.txt 100000000
 
