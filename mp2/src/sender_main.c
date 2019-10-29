@@ -59,8 +59,8 @@ And they are only changed in thread 2, so in thread 2 only write need mutex */
 /* timeOutInterval, timerNum, timerReady is shared by thread 1, 2 and signal handler */
 sem_t mutex;
 /* Timeout parameters, ms */
-double timeOutInterval = 25;
-double estimatedRTT = 25;
+double timeOutInterval = 30;
+double estimatedRTT = 30;
 double devRTT = 0;
 ull timerNum;
 bool timerReady = true;
@@ -141,7 +141,7 @@ void reliablyTransfer(char* hostname, us hostUDPport, char* filename, ull bytesT
             ualarm(0, 0);
             break;
         }
-        // calculateRTT(ack.sendTime);
+        calculateRTT(ack.sendTime);
         printf("ack=%lld, base=%lld, seq=%lld, mode=%d, cwnd=%.3f, thresh=%.3f, dup=%d, interval=%.3f\n", ackNum, sendBase, nextSeqNum, mode, cwnd, ssthresh, dupACKcount, timeOutInterval);
         if (!timerReady && ackNum > timerNum) {
             ualarm(0, 0);
