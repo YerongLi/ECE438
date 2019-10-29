@@ -22,7 +22,7 @@ typedef unsigned short int us;
 #define beta 0.25
 #define alpha 0.125
 #define cwndDecay 0.5
-#define inc 1
+#define inc 3
 
 typedef struct {
     ull seqNum;
@@ -49,7 +49,7 @@ enum Congestion_Control{SS, CA, FR};
 int mode = SS;
 int dupACKcount = 0;
 double ssthresh = 100;
-double cwnd = 1;
+double cwnd = inc;
 ull sendBase = 0;
 ull nextSeqNum = 0;
 ull packetResent = 0;
@@ -143,7 +143,7 @@ void* threadRecvRetransmit(void*) {
             mode = SS;
             ssthresh = cwnd * cwndDecay;
             sem_wait(&mutex);
-            cwnd = 1;
+            cwnd = inc;
             sem_post(&mutex);
             dupACKcount = 0;
             continue;
